@@ -1,0 +1,7 @@
+{
+  "name": "hh-api-anything-runner",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.mjs", "test": "node --test *.test.mjs" },
+  "dependencies": { "api-anything": "0.3.2", "node-html-parser": "^9.0.4" }
+}

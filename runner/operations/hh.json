@@ -1,0 +1,541 @@
+{
+  "name": "hh",
+  "baseUrl": "https://hh.ru",
+  "operations": [
+    {
+      "name": "searchVacancies",
+      "description": "Search authenticated hh.ru vacancies and return result metadata for a page.",
+      "request": {
+        "method": "GET",
+        "url": "https://hh.ru/search/vacancy?text=%7Btext%7D&area=%7Barea%7D&page=%7Bpage%7D&experience=%7Bexperience%7D&employment_form=%7Bemployment_form%7D&work_format=%7Bwork_format%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "priority": "u=0, i",
+          "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        }
+      },
+      "slots": [
+        {
+          "param": "text",
+          "at": [
+            "query:text"
+          ]
+        },
+        {
+          "param": "area",
+          "at": [
+            "query:area"
+          ]
+        },
+        {
+          "param": "page",
+          "at": [
+            "query:page"
+          ]
+        },
+        {
+          "param": "experience",
+          "at": [
+            "query:experience"
+          ]
+        },
+        {
+          "param": "employment_form",
+          "at": [
+            "query:employment_form"
+          ]
+        },
+        {
+          "param": "work_format",
+          "at": [
+            "query:work_format"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://hh.ru/search/vacancy?text={text}&area={area}&page={page}&experience={experience}&employment_form={employment_form}&work_format={work_format}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "hh.ru",
+        "path": "/search/vacancy"
+      },
+      "response": {
+        "format": "html",
+        "contentType": "text/html; charset=utf-8",
+        "html": {
+          "items": "body",
+          "fields": {
+            "heading": "[data-qa=\"vacancies-search-header\"]",
+            "currentPage": "[data-qa=\"pager-page\"][aria-current=\"true\"]",
+            "allPages": "all:[data-qa=\"pager-page\"]",
+            "nextUrl": "[data-qa=\"pager-next\"]@href"
+          }
+        }
+      },
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "example": "Python"
+        },
+        {
+          "name": "area",
+          "type": "string",
+          "required": true,
+          "example": "1"
+        },
+        {
+          "name": "page",
+          "type": "string",
+          "required": true,
+          "example": "2",
+          "min": 0,
+          "max": 39
+        },
+        {
+          "name": "experience",
+          "type": "string",
+          "required": true,
+          "example": "between1And3",
+          "enum": [
+            "noExperience",
+            "between1And3",
+            "between3And6",
+            "moreThan6"
+          ]
+        },
+        {
+          "name": "employment_form",
+          "type": "string",
+          "required": true,
+          "example": "FULL",
+          "enum": [
+            "FULL",
+            "PART",
+            "PROJECT",
+            "FLY_IN_FLY_OUT"
+          ]
+        },
+        {
+          "name": "work_format",
+          "type": "string",
+          "required": true,
+          "example": "REMOTE",
+          "enum": [
+            "ON_SITE",
+            "REMOTE",
+            "HYBRID",
+            "FIELD_WORK"
+          ]
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "checks": [
+        {
+          "args": {
+            "text": "Golang",
+            "area": "1",
+            "page": "0",
+            "experience": "between1And3",
+            "employment_form": "FULL",
+            "work_format": "HYBRID"
+          },
+          "expect": "result",
+          "purpose": "new query returns matching Golang search metadata with all filters applied"
+        }
+      ],
+      "paging": {
+        "param": "page"
+      }
+    },
+    {
+      "name": "listVacancyLinks",
+      "description": "List vacancy links from an authenticated hh.ru search result page.",
+      "request": {
+        "method": "GET",
+        "url": "https://hh.ru/search/vacancy?text=%7Btext%7D&area=%7Barea%7D&page=%7Bpage%7D&experience=%7Bexperience%7D&employment_form=%7Bemployment_form%7D&work_format=%7Bwork_format%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "priority": "u=0, i",
+          "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        }
+      },
+      "slots": [
+        {
+          "param": "text",
+          "at": [
+            "query:text"
+          ]
+        },
+        {
+          "param": "area",
+          "at": [
+            "query:area"
+          ]
+        },
+        {
+          "param": "page",
+          "at": [
+            "query:page"
+          ]
+        },
+        {
+          "param": "experience",
+          "at": [
+            "query:experience"
+          ]
+        },
+        {
+          "param": "employment_form",
+          "at": [
+            "query:employment_form"
+          ]
+        },
+        {
+          "param": "work_format",
+          "at": [
+            "query:work_format"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://hh.ru/search/vacancy?text={text}&area={area}&page={page}&experience={experience}&employment_form={employment_form}&work_format={work_format}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "hh.ru",
+        "path": "/search/vacancy"
+      },
+      "response": {
+        "format": "html",
+        "contentType": "text/html; charset=utf-8",
+        "html": {
+          "items": "[data-qa=\"vacancy-serp__results\"] [data-qa=\"vacancy-serp__vacancy\"]",
+          "fields": {
+            "title": "[data-qa=\"serp-item__title-text\"]",
+            "url": "[data-qa=\"serp-item__title\"]@href",
+            "employer": "[data-qa=\"vacancy-serp__vacancy-employer-text\"]",
+            "address": "[data-qa=\"vacancy-serp__vacancy-address\"]",
+            "compensation": "[data-qa=\"vacancy-serp__compensation\"]",
+            "currentViewers": "[data-qa=\"vacancy-serp-item-activity\"] span"
+          },
+          "empty": "[data-qa=\"vacancy-serp__results\"]"
+        }
+      },
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "example": "Python"
+        },
+        {
+          "name": "area",
+          "type": "string",
+          "required": true,
+          "example": "1"
+        },
+        {
+          "name": "page",
+          "type": "string",
+          "required": true,
+          "example": "2",
+          "min": 0,
+          "max": 39
+        },
+        {
+          "name": "experience",
+          "type": "string",
+          "required": true,
+          "example": "between1And3",
+          "enum": [
+            "noExperience",
+            "between1And3",
+            "between3And6",
+            "moreThan6"
+          ]
+        },
+        {
+          "name": "employment_form",
+          "type": "string",
+          "required": true,
+          "example": "FULL",
+          "enum": [
+            "FULL",
+            "PART",
+            "PROJECT",
+            "FLY_IN_FLY_OUT"
+          ]
+        },
+        {
+          "name": "work_format",
+          "type": "string",
+          "required": true,
+          "example": "REMOTE",
+          "enum": [
+            "ON_SITE",
+            "REMOTE",
+            "HYBRID",
+            "FIELD_WORK"
+          ]
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "checks": [
+        {
+          "args": {
+            "text": "Golang",
+            "area": "1",
+            "page": "0",
+            "experience": "between1And3",
+            "employment_form": "FULL",
+            "work_format": "HYBRID"
+          },
+          "expect": "result",
+          "purpose": "new query returns vacancy links whose result page satisfies the selected filters"
+        }
+      ],
+      "paging": {
+        "param": "page"
+      }
+    },
+    {
+      "name": "getVacancy",
+      "description": "Parse the full visible authenticated hh.ru vacancy page, including description and key skills.",
+      "request": {
+        "method": "GET",
+        "url": "https://hh.ru/vacancy/%7BvacancyId%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "priority": "u=0, i",
+          "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        }
+      },
+      "slots": [
+        {
+          "param": "vacancyId",
+          "at": [
+            "path:1"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://hh.ru/vacancy/{vacancyId}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "hh.ru",
+        "path": "/vacancy/*"
+      },
+      "response": {
+        "format": "html",
+        "contentType": "text/html; charset=utf-8",
+        "html": {
+          "items": "body",
+          "fields": {
+            "title": "[data-qa=\"vacancy-title\"]",
+            "company": "[data-qa=\"vacancy-company-name\"]",
+            "salary": "[data-qa=\"vacancy-salary\"]",
+            "experience": "[data-qa=\"vacancy-experience\"]",
+            "employment": "[data-qa=\"common-employment-text\"]",
+            "workFormats": "all:[data-qa=\"work-formats-text\"]",
+            "workSchedule": "[data-qa=\"work-schedule-by-days-text\"]",
+            "workingHours": "[data-qa=\"working-hours-text\"]",
+            "address": "[data-qa=\"vacancy-view-raw-address\"]",
+            "description": "[data-qa=\"vacancy-description\"]",
+            "keySkills": "all:[data-qa=\"skills-element\"]",
+            "publishedAt": "time@datetime"
+          }
+        }
+      },
+      "params": [
+        {
+          "name": "vacancyId",
+          "type": "string",
+          "required": true,
+          "example": "138866721"
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "checks": [
+        {
+          "args": {
+            "vacancyId": "138628005"
+          },
+          "expect": "result",
+          "purpose": "new vacancy returns title, employer, description, key skills and publication date"
+        }
+      ]
+    },
+    {
+      "name": "getVacancyViewCount",
+      "description": "Return the current viewer count for an hh.ru vacancy; null means hh.ru is not displaying a count now.",
+      "request": {
+        "method": "GET",
+        "url": "https://hh.ru/shards/vacancy_view_count?vacancyId=%7BvacancyId%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "priority": "u=0, i",
+          "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        }
+      },
+      "slots": [
+        {
+          "param": "vacancyId",
+          "at": [
+            "query:vacancyId"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://hh.ru/shards/vacancy_view_count?vacancyId={vacancyId}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "hh.ru",
+        "path": "/shards/vacancy_view_count"
+      },
+      "response": {
+        "format": "json",
+        "contentType": "application/json",
+        "pick": [
+          "vacancyViewCount"
+        ],
+        "shape": {
+          "vacancyViewCount": "null"
+        }
+      },
+      "params": [
+        {
+          "name": "vacancyId",
+          "type": "string",
+          "required": true,
+          "example": "138866721"
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "unproven": {
+        "params": [
+          "vacancyId"
+        ],
+        "reason": "example 2 (vacancyId=138180720) was answered with example 1's data"
+      }
+    },
+    {
+      "name": "getVacancyResponseCount",
+      "description": "Return the authenticated hh.ru vacancy response count from its server-rendered initial state.",
+      "request": {
+        "method": "GET",
+        "url": "https://hh.ru/vacancy/%7BvacancyId%7D",
+        "headers": {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "priority": "u=0, i",
+          "sec-ch-ua": "\"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"156\", \"Google Chrome\";v=\"156\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        }
+      },
+      "slots": [
+        {
+          "param": "vacancyId",
+          "at": [
+            "path:1"
+          ]
+        }
+      ],
+      "volatile": [],
+      "trigger": {
+        "url": "https://hh.ru/vacancy/{vacancyId}"
+      },
+      "match": {
+        "method": "GET",
+        "host": "hh.ru",
+        "path": "/vacancy/*"
+      },
+      "response": {
+        "format": "embedded",
+        "contentType": "text/html; charset=utf-8",
+        "embedded": {
+          "regex": "vacancyResponsesCount&#34;:(\\d+)"
+        }
+      },
+      "params": [
+        {
+          "name": "vacancyId",
+          "type": "string",
+          "required": true,
+          "example": "138866721"
+        }
+      ],
+      "readOnly": true,
+      "minTier": 1,
+      "learnedLoggedIn": false,
+      "checks": [
+        {
+          "args": {
+            "vacancyId": "138628005"
+          },
+          "expect": "result",
+          "purpose": "new vacancy returns a numeric authenticated response count"
+        }
+      ]
+    }
+  ]
+}

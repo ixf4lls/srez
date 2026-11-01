@@ -1,0 +1,70 @@
+name: hh-analytics
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: hh_analytics
+      POSTGRES_USER: hh
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hh-local-development}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U hh -d hh_analytics]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  runner:
+    build: ./runner
+    environment:
+      API_ANYTHING_HOME: /var/lib/api-anything
+      SESSION_SOURCE: /seed/hh-session.json
+      PORT: '8091'
+    volumes:
+      - ${API_ANYTHING_SOURCE:-${HOME}/.api-anything}/sessions/hh.json:/seed/hh-session.json:ro
+      - runner_data:/var/lib/api-anything
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://localhost:8091/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgres://hh:${POSTGRES_PASSWORD:-hh-local-development}@postgres:5432/hh_analytics?sslmode=disable
+      RUNNER_URL: http://runner:8091
+      PORT: '8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      runner:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/api/health']
+      interval: 3s
+      timeout: 4s
+      retries: 20
+    restart: unless-stopped
+  web:
+    build: ./frontend
+    ports:
+      - '127.0.0.1:${APP_PORT:-3000}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+  api-tests:
+    profiles: [test]
+    build:
+      context: ./api
+      target: build
+    environment:
+      TEST_DATABASE_URL: postgres://hh:${POSTGRES_PASSWORD:-hh-local-development}@postgres:5432/hh_analytics?sslmode=disable
+    command: [go, test, ./...]
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  postgres_data:
+  runner_data:
