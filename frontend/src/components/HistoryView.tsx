@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {AlertCircle,ArrowRight,ArrowUpRight,LoaderCircle,Plus,Search,Trash2,Undo2,X} from 'lucide-react';
+import {AlertCircle,ArrowRight,LoaderCircle,Plus,Search,Trash2,Undo2,X} from 'lucide-react';
 import {api,date,isActive,number,statusLabel} from '../types';
 import type {Analysis} from '../types';
 
@@ -38,7 +38,7 @@ export function HistoryView({analyses,loading,error,navigate,refresh,onNew}:{ana
     </div>}
     <div className="history-list">{loading?<div className="empty-state"><LoaderCircle className="spin"/>Загрузка…</div>:filtered.length?filtered.map(a=><article className={`history-item history-selectable ${selected.has(a.id)?'is-selected':''}`} key={a.id}>
       <input type="checkbox" className="row-checkbox" aria-label={`Выбрать ${a.title}, ${date(a.createdAt)}`} checked={selected.has(a.id)} disabled={busy} onChange={()=>toggle(a.id)}/>
-      <button className="history-open" onClick={()=>navigate(`/analyses/${a.id}`)}><div className="history-main"><h3>{a.title}</h3><span>{date(a.createdAt)} · {a.mode==='roles'?'В названии':'Во всём тексте'}</span></div><div className="history-info"><strong>{number(a.processed)}</strong><span>вакансий</span></div><span className={`status-badge status-${a.status}`}>{isActive(a)&&<LoaderCircle size={12} className="spin"/>}{statusLabel[a.status]||a.status}</span><ArrowUpRight size={17}/></button>
+      <button className="history-open" onClick={()=>navigate(`/analyses/${a.id}`)}><div className="history-main"><h3>{a.title}</h3><span>{date(a.createdAt)} · {a.mode==='roles'?'В названии':'Во всём тексте'}</span></div><div className="history-info"><strong>{number(a.processed)}</strong><span>вакансий</span></div><span className={`status-badge status-${a.status}`}>{isActive(a)&&<LoaderCircle size={12} className="spin"/>}{statusLabel[a.status]||a.status}</span></button>
       <button className="icon-button delete-row" aria-label={`Удалить ${a.title}, ${date(a.createdAt)}`} title="Удалить" disabled={busy} onClick={()=>void remove([a.id])}><Trash2 size={16}/></button>
     </article>):<div className="empty-state large"><h2>{query?'Ничего не найдено':'Нет анализов'}</h2>{!query&&<button className="button primary" onClick={onNew}>Новый анализ<ArrowRight size={16}/></button>}</div>}</div>
     {undo.length>0&&<div className="undo-toast" role="status"><span>Удалено: {number(undo.length)}</span><button className="text-button" disabled={busy} onClick={()=>void restore()}><Undo2 size={14}/>Отменить</button><button className="icon-button" aria-label="Скрыть уведомление" onClick={()=>setUndo([])}><X size={15}/></button></div>}

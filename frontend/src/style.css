@@ -140,3 +140,13 @@
 }
 @media(max-width:430px){.donut-content{grid-template-columns:160px minmax(0,1fr);gap:9px;padding:6px 14px 13px}.donut-chart{min-width:160px}.chart-legend button{font-size:10px}.chart-legend strong{font-size:10px}.card-heading{padding-left:16px;padding-right:16px}.salary-unit-select{max-width:100%;order:3;flex-basis:100%;margin-left:0}.salary-unit-select~.chart-meta{margin-left:auto}.vacancy-count small{flex-basis:100%;margin:0}.all-vacancies-cta .button{font-size:11px}}
 @media(max-width:360px){.donut-content{grid-template-columns:1fr;gap:3px}.donut-chart{width:190px;justify-self:center}.chart-legend{padding:0 8px 5px}.chart-legend button{font-size:11px}}
+
+/* The report is data first: only the modal overlay uses blur to separate a temporary layer. */
+.site-header{backdrop-filter:none;background:#fff}
+.analysis-filterbar{backdrop-filter:none;background:#fff}
+.chart-card{border-radius:10px}
+.card-source{border-top:0;padding-top:8px;padding-bottom:14px}
+.history-list{gap:0;border-top:1px solid var(--border)}
+.history-item{border-left:0;border-right:0;border-top:0;border-radius:0;background:transparent;padding:18px 8px}
+.history-item:hover{background:#f8f7fa;border-color:var(--border)}
+.history-selectable.is-selected{background:#f5f1ff;border-color:#cbb9ee}

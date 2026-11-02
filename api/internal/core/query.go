@@ -140,7 +140,7 @@ func Optimize(query, mode string) (Proposal, error) {
 	} else if remaining != "" {
 		terms = append(terms, "("+remaining+")")
 	}
-	explanations := []string{fmt.Sprintf("Распознано технологий: %d. Варианты написания объединены через OR; разные технологии — через AND.", len(found))}
+	explanations := []string{fmt.Sprintf("Распознано технологий: %d. Варианты написания объединены через OR; разные технологии: через AND.", len(found))}
 	if mode == "roles" {
 		explanations = append(explanations, "Основная технология ищется в названии вакансии. Это уменьшает число смежных профессий.")
 	} else {
