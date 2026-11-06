@@ -47,13 +47,23 @@ func TestRejectCrossOriginMutation(t *testing.T) {
 	}
 }
 
-func TestBulkDeleteValidatesIDsBeforeAccessingStorage(t *testing.T) {
-	for _, body := range []string{`{"ids":[]}`, `{"ids":["../all"]}`, `{"ids":["32f2b0ac20050e260fc43977","bad"]}`} {
-		req := httptest.NewRequest("POST", "/api/analyses/delete", strings.NewReader(body))
+func TestSingleDeletionValidatesIDBeforeAccessingStorage(t *testing.T) {
+	for _, path := range []string{"/api/analyses/bad/delete", "/api/analyses/bad/restore"} {
+		req := httptest.NewRequest("POST", path, nil)
 		w := httptest.NewRecorder()
 		(&Server{}).Handler().ServeHTTP(w, req)
 		if w.Code != 400 {
-			t.Fatalf("invalid bulk request accepted: %d", w.Code)
+			t.Fatalf("invalid single-record request accepted: %d", w.Code)
+		}
+	}
+}
+
+func TestBulkDeletionRoutesAreUnavailable(t *testing.T) {
+	for _, path := range []string{"/api/analyses/delete", "/api/analyses/restore"} {
+		w := httptest.NewRecorder()
+		(&Server{}).Handler().ServeHTTP(w, httptest.NewRequest("POST", path, strings.NewReader(`{"ids":["aaaaaaaaaaaaaaaaaaaaaaaa","bbbbbbbbbbbbbbbbbbbbbbbb"]}`)))
+		if w.Code != http.StatusMethodNotAllowed && w.Code != http.StatusNotFound {
+			t.Fatalf("bulk route is still available: %d", w.Code)
 		}
 	}
 }

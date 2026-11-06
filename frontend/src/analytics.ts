@@ -82,67 +82,47 @@ export function deriveReport(base:Report, vacancies:Vacancy[]):Report {
 }
 
 export type Salary = {from:number|null;to:number|null;currency:string;period:string;tax:string;raw:string};
-export type SalaryPoint = Salary & {
-  id:string;
-  title:string;
-  range:[number,number];
-  normalizedRange:[number,number];
-  normalizedFrom:number;
-  normalizedTo:number;
-  normalizedSpan:number;
-  original:string;
-};
+export type SalaryRates = Record<string, number>;
+export type SalaryPoint = Salary & {id:string;title:string;range:[number,number];normalizedRange:[number,number];normalizedFrom:number|null;normalizedTo:number|null};
 export type SalaryGroup = {key:string;label:string;points:SalaryPoint[]};
 
-export type SalaryRates = Record<string,number>;
-
-// Used until the API returns a fresh rate table. Values are only a rendering fallback.
-export const fallbackSalaryRates:SalaryRates={RUB:1,USD:92,EUR:99,GBP:116,CNY:13,JPY:.62,CHF:105,CAD:67,AUD:60,HKD:12,SGD:69,NZD:55,INR:1.1,TRY:2.8,PLN:23,CZK:4.1,SEK:8.7,NOK:8.5,DKK:13.3,ILS:25,BRL:18,ZAR:5,THB:2.6,KRW:.065,VND:.0037,AED:25,AMD:.23,GEL:34,MDL:5.1,UAH:2.3,KZT:0.2,BYN:29,UZS:0.0074,KGS:1.05,AZN:54};
-
-const monthlyFactor=(period:string)=>period==='год'?1/12:period==='неделя'?52/12:period==='день'?22:period==='час'?176:1;
-
 export function netFromGross(monthly:number):number {
-  if(monthly<=0)return 0;
+  if(!Number.isFinite(monthly)||monthly<=0)return 0;
   const annual=monthly*12;
-  const bands:[[number,number],...[number,number][]]=[[2_400_000,.13],[5_000_000,.15],[20_000_000,.18],[50_000_000,.20],[Infinity,.22]];
+  const bands:[number,number][]=[[2_400_000,.13],[5_000_000,.15],[20_000_000,.18],[50_000_000,.20],[Infinity,.22]];
   let tax=0,previous=0;
   for(const [limit,rate] of bands){
-    const taxable=Math.max(0,Math.min(annual,limit)-previous);
-    tax+=taxable*rate; previous=limit;
+    tax+=Math.max(0,Math.min(annual,limit)-previous)*rate;
+    previous=limit;
     if(annual<=limit)break;
   }
-  return Math.max(0,(annual-tax)/12);
+  return (annual-tax)/12;
 }
 
-export const grossToNet=netFromGross;
-
-export function normalizeSalary(salary:Salary,rates:SalaryRates=fallbackSalaryRates):[number,number] {
-  const rate=rates[salary.currency]??1;
-  const factor=monthlyFactor(salary.period);
+export function normalizeSalary(salary:Salary,rates:SalaryRates):[number|null,number|null]|null {
+  const rate=salary.currency==='RUB'?1:rates[salary.currency];
+  const factor:Record<string,number>={'месяц':1,'год':1/12,'неделя':52/12,'день':22,'час':176};
+  if(!Number.isFinite(rate)||rate<=0||!factor[salary.period]||salary.tax==='налоги не указаны')return null;
   const convert=(value:number|null)=>{
     if(value==null)return null;
-    const monthly=value*rate*factor;
-    return salary.tax==='до вычета налогов'?netFromGross(monthly):monthly;
+    const monthly=value*rate*factor[salary.period];
+    return Math.round(salary.tax==='до вычета налогов'?netFromGross(monthly):monthly);
   };
-  const from=convert(salary.from)??0;
-  const to=convert(salary.to)??from;
-  return [Math.round(Math.min(from,to)),Math.round(Math.max(from,to))];
+  return [convert(salary.from),convert(salary.to)];
 }
 
 export function parseSalary(raw:string):Salary|null {
   if(!raw?.trim())return null;
   const text=raw.replace(/[\u00a0\u202f]/g,' ').trim();
   const currencyRules:[RegExp,string][]=[
-    [/₽|руб|\bRUB\b|\bRUR\b/i,'RUB'],[/\$|\bUSD\b/i,'USD'],[/€|\bEUR\b/i,'EUR'],[/£|\bGBP\b/i,'GBP'],
-    [/¥|￥|\bCNY\b|юан/i,'CNY'],[/円|\bJPY\b|иен/i,'JPY'],[/₣|\bCHF\b|франк/i,'CHF'],[/\bCAD\b|канадск/i,'CAD'],[/\bAUD\b|австрал/i,'AUD'],[/\bHKD\b|гонконгск/i,'HKD'],[/\bSGD\b|сингапурск/i,'SGD'],[/\bNZD\b|новозеландск/i,'NZD'],
-    [/₹|\bINR\b|рупи/i,'INR'],[/₺|\bTRY\b|лир/i,'TRY'],[/zł|\bPLN\b|злот/i,'PLN'],[/\bCZK\b|чешск/i,'CZK'],[/\bSEK\b|шведск/i,'SEK'],[/\bNOK\b|норвежск/i,'NOK'],[/\bDKK\b|датск/i,'DKK'],[/₪|\bILS\b|шекел/i,'ILS'],[/R\$|\bBRL\b|бразильск/i,'BRL'],[/\bZAR\b|южноафриканск/i,'ZAR'],[/฿|\bTHB\b|бат/i,'THB'],[/₩|\bKRW\b|вон/i,'KRW'],[/₫|\bVND\b|донг/i,'VND'],[/د.?إ|\bAED\b|дирхам/i,'AED'],[/֏|\bAMD\b|драм/i,'AMD'],[/₾|\bGEL\b|лари/i,'GEL'],[/\bMDL\b|ле[йи]/i,'MDL'],[/₴|\bUAH\b|гривн/i,'UAH'],
-    [/₸|\bKZT\b|тенге/i,'KZT'],[/\bBYN\b|\bBr\b/i,'BYN'],[/\bUZS\b|сум/i,'UZS'],[/\bKGS\b|сом/i,'KGS'],[/₼|\bAZN\b/i,'AZN'],
+    [/₽|руб|\bRUB\b|\bRUR\b/i,'RUB'],[/\bCAD\b|C\$/i,'CAD'],[/\bAUD\b|A\$/i,'AUD'],[/\bHKD\b|HK\$/i,'HKD'],[/\bSGD\b|S\$/i,'SGD'],[/\bNZD\b|NZ\$/i,'NZD'],[/R\$|\bBRL\b/i,'BRL'],
+    [/\$|\bUSD\b/i,'USD'],[/€|\bEUR\b/i,'EUR'],[/£|\bGBP\b/i,'GBP'],[/\bJPY\b|円|иен/i,'JPY'],[/¥|￥|\bCNY\b|юан/i,'CNY'],[/₣|\bCHF\b|франк/i,'CHF'],
+    [/₸|\bKZT\b|тенге/i,'KZT'],[/\bBYN\b|\bBr\b/i,'BYN'],[/\bUZS\b|сум|so['‘’ʻʼ`]?m/i,'UZS'],[/\bKGS\b|сом/i,'KGS'],[/₼|\bAZN\b/i,'AZN'],
+    [/֏|\bAMD\b|драм/i,'AMD'],[/₾|\bGEL\b|лари/i,'GEL'],[/د.?إ|\bAED\b|дирхам/i,'AED'],[/₺|\bTRY\b|лир/i,'TRY'],[/₹|\bINR\b|рупи/i,'INR'],
   ];
-  let currencyRule=currencyRules.find(([re])=>re.test(text));
-  if(!currencyRule){
-    const code=text.match(/\b[A-Z]{3}\b/i)?.[0];
-    if(code)currencyRule=[new RegExp(`\\b${code}\\b`,'i'),code.toUpperCase()];
-  }
+  const code=text.match(/\b[A-Z]{3}\b/)?.[0];
+  if(code&&!currencyRules.some(([re])=>re.test(text)))currencyRules.push([new RegExp(`\\b${code}\\b`),code]);
+  const currencyRule=currencyRules.find(([re])=>re.test(text));
   if(!currencyRule)return null;
   const currencyIndex=text.search(currencyRule[0]);
   const salaryText=text.slice(0,currencyIndex);
@@ -161,20 +141,26 @@ export function parseSalary(raw:string):Salary|null {
   return {from,to,currency:currencyRule[1],period,tax,raw};
 }
 
-export function salaryGroups(vacancies:Vacancy[],rates:SalaryRates=fallbackSalaryRates):SalaryGroup[] {
-  const group:SalaryGroup={key:'normalized-rub-monthly',label:'RUB per month, net (normalized)',points:[]};
+export function salaryGroups(vacancies:Vacancy[],rates:SalaryRates={RUB:1}):SalaryGroup[] {
+  const group:SalaryGroup={key:'normalized-rub-net',label:'₽ в месяц, на руки',points:[]};
   for(const v of vacancies){
     if(!v.loaded)continue;
     const salary=parseSalary(v.salary);if(!salary)continue;
+    const normalized=normalizeSalary(salary,rates);if(!normalized)continue;
     const from=salary.from,to=salary.to;
     const range:[number,number]=from!=null&&to!=null&&from!==to?[from,to]:[0,to??from??0];
-    const normalized=normalizeSalary(salary,rates);
-    const normalizedFrom=from!=null&&to==null?normalized[0]:from!=null&&to!=null&&from!==to?normalized[0]:0;
-    const normalizedTo=normalized[1];
-    const normalizedSpan=Math.max(normalizedTo-normalizedFrom,from!=null&&to==null?Math.round(Math.max(normalizedFrom,1)*.01):1);
-    group.points.push({...salary,id:v.id,title:v.title,range,normalizedRange:[normalizedFrom,normalizedTo],normalizedFrom,normalizedTo,normalizedSpan,original:salary.raw});
+    const [normalizedFrom,normalizedTo]=normalized;
+    const normalizedRange:[number,number]=normalizedFrom!=null&&normalizedTo!=null&&normalizedFrom!==normalizedTo?[normalizedFrom,normalizedTo]:[0,normalizedTo??normalizedFrom??0];
+    group.points.push({...salary,id:v.id,title:v.title,range,normalizedRange,normalizedFrom,normalizedTo});
   }
   return group.points.length?[group]:[];
+}
+
+export function normalizedSalaryLabel(point:SalaryPoint):string {
+  const format=(value:number)=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(value);
+  const from=point.normalizedFrom,to=point.normalizedTo;
+  const amount=from!=null&&to!=null?(from===to?format(from):`${format(from)}–${format(to)}`):from!=null?`от ${format(from)}`:`до ${format(to??0)}`;
+  return `${amount} ₽/мес. на руки`;
 }
 
 export function readViewFilters():ViewFilters {

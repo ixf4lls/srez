@@ -2,83 +2,117 @@ package server
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"io"
+	"log"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/text/encoding/charmap"
 )
 
-type cbrRate struct {
-	Value   float64 `json:"Value"`
-	Nominal float64 `json:"Nominal"`
-}
+const cbrRatesURL = "https://www.cbr.ru/scripts/XML_daily.asp"
 
-type cbrDaily struct {
-	Valute map[string]cbrRate `json:"Valute"`
-}
-
-var ratesCache struct {
+type currencyRatesCache struct {
 	sync.Mutex
 	values    map[string]float64
 	fetchedAt time.Time
+	date      string
+}
+
+func parseCBRRates(reader io.Reader) (map[string]float64, string, error) {
+	var payload struct {
+		XMLName xml.Name `xml:"ValCurs"`
+		Date    string   `xml:"Date,attr"`
+		Values  []struct {
+			Code    string  `xml:"CharCode"`
+			Nominal float64 `xml:"Nominal"`
+			Value   string  `xml:"Value"`
+		} `xml:"Valute"`
+	}
+	decoder := xml.NewDecoder(io.LimitReader(reader, 1<<20))
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		if strings.EqualFold(charset, "windows-1251") {
+			return charmap.Windows1251.NewDecoder().Reader(input), nil
+		}
+		return nil, fmt.Errorf("unsupported exchange-rate encoding: %s", charset)
+	}
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, "", err
+	}
+	date, err := time.Parse("02.01.2006", payload.Date)
+	if err != nil {
+		return nil, "", err
+	}
+	values := map[string]float64{"RUB": 1}
+	for _, item := range payload.Values {
+		value, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(item.Value), ",", "."), 64)
+		if err == nil && value > 0 && item.Nominal > 0 && !math.IsInf(value, 0) && !math.IsNaN(value) && !math.IsInf(item.Nominal, 0) && !math.IsNaN(item.Nominal) && len(item.Code) == 3 && item.Code != "RUB" {
+			values[item.Code] = value / item.Nominal
+		}
+	}
+	if len(values) < 2 {
+		return nil, "", fmt.Errorf("empty exchange-rate table")
+	}
+	return values, date.Format("2006-01-02"), nil
 }
 
 func (s *Server) rates(w http.ResponseWriter, r *http.Request) {
-	ratesCache.Lock()
-	if len(ratesCache.values) > 0 && time.Since(ratesCache.fetchedAt) < 6*time.Hour {
-		value := map[string]any{"rates": ratesCache.values, "fetchedAt": ratesCache.fetchedAt, "source": "ЦБ РФ"}
-		ratesCache.Unlock()
-		write(w, http.StatusOK, value)
+	c := &s.ratesState
+	c.Lock()
+	defer c.Unlock()
+	respond := func(stale bool) {
+		write(w, http.StatusOK, map[string]any{"rates": c.values, "date": c.date, "fetchedAt": c.fetchedAt, "source": "Банк России", "sourceUrl": cbrRatesURL, "stale": stale})
+	}
+	if len(c.values) > 1 && time.Since(c.fetchedAt) < 6*time.Hour {
+		respond(false)
 		return
 	}
-	ratesCache.Unlock()
-
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.cbr-xml-daily.ru/daily_json.js", nil)
-	if err != nil {
-		fail(w, http.StatusBadGateway, "Не удалось подготовить запрос текущих курсов")
-		return
+	endpoint := s.ratesEndpoint
+	if endpoint == "" {
+		endpoint = cbrRatesURL
 	}
-	res, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
-	if err != nil {
-		writeCachedRates(w)
-		return
+	client := s.ratesClient
+	if client == nil {
+		client = &http.Client{Timeout: 6 * time.Second}
 	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		writeCachedRates(w)
-		return
-	}
-	var payload cbrDaily
-	if err = json.NewDecoder(res.Body).Decode(&payload); err != nil {
-		writeCachedRates(w)
-		return
-	}
-	values := map[string]float64{"RUB": 1}
-	for code, item := range payload.Valute {
-		if item.Value > 0 && item.Nominal > 0 {
-			values[code] = item.Value / item.Nominal
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err == nil {
+		req.Header.Set("User-Agent", "srez/1.0")
+		req.Header.Set("Accept", "application/xml")
+		var res *http.Response
+		res, err = client.Do(req)
+		if err == nil {
+			defer res.Body.Close()
+			if res.StatusCode == http.StatusOK {
+				var values map[string]float64
+				var date string
+				values, date, err = parseCBRRates(res.Body)
+				if err == nil {
+					c.values = values
+					c.date = date
+					c.fetchedAt = time.Now().UTC()
+					respond(false)
+					return
+				}
+			} else {
+				err = fmt.Errorf("exchange-rate HTTP status: %d", res.StatusCode)
+			}
 		}
 	}
-	if len(values) <= 1 {
-		writeCachedRates(w)
+	if err != nil {
+		log.Printf("currency rates: %v", err)
+	}
+	if len(c.values) > 1 {
+		respond(true)
 		return
 	}
-	now := time.Now().UTC()
-	ratesCache.Lock()
-	ratesCache.values = values
-	ratesCache.fetchedAt = now
-	ratesCache.Unlock()
-	write(w, http.StatusOK, map[string]any{"rates": values, "fetchedAt": now, "source": "ЦБ РФ"})
-}
-
-func writeCachedRates(w http.ResponseWriter) {
-	ratesCache.Lock()
-	defer ratesCache.Unlock()
-	if len(ratesCache.values) == 0 {
-		fail(w, http.StatusBadGateway, "Текущий курс валют недоступен")
-		return
-	}
-	write(w, http.StatusOK, map[string]any{"rates": ratesCache.values, "fetchedAt": ratesCache.fetchedAt, "source": "ЦБ РФ", "stale": true})
+	fail(w, http.StatusBadGateway, "Не удалось получить курсы Банка России")
 }

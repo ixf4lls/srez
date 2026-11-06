@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { number } from '../types';
 import type { Metric, ResponsePoint, Vacancy } from '../types';
 import type { Dimension, SalaryPoint } from '../analytics';
+import { normalizedSalaryLabel } from '../analytics';
 import { ResponsePlot, SalaryPlot } from './VacancyCharts';
 import { VacancyBrowser } from './Vacancies';
 import { EmptyState } from './AppUI';
@@ -32,7 +33,7 @@ export function Explorer({ context, vacancies, onClose, onFilter }: { context: E
       <TabsContent value="data"><div className="source-data"><p className="field-hint">Нажмите на строку, чтобы проверить исходные вакансии.</p><div className="data-table-scroll"><table className="data-table"><thead><tr><th>{context?.metrics ? 'Показатель' : 'Вакансия'}</th><th className="numeric">{context?.points ? 'Отклики' : context?.salaries ? 'Зарплата' : 'Вакансии'}</th>{context?.metrics && <th className="numeric">Доля</th>}</tr></thead><tbody>
         {context?.metrics?.map(m => <tr key={m.key}><td><button className="inline-link" onClick={() => { setMetric(m); setSelectedId(undefined); setTab('vacancies'); }}>{m.label}</button></td><td className="numeric">{number(m.count)}</td><td className="numeric">{number(m.percent)}%</td></tr>)}
         {context?.points?.map(p => <tr key={p.id}><td><button className="inline-link" onClick={() => openVacancy(p.id)}>{p.title}</button></td><td className="numeric">{number(p.count)}</td></tr>)}
-        {context?.salaries?.map(p => <tr key={p.id}><td><button className="inline-link" onClick={() => openVacancy(p.id)}>{p.title}</button></td><td>{p.raw}</td></tr>)}
+        {context?.salaries?.map(p => <tr key={p.id}><td><button className="inline-link" onClick={() => openVacancy(p.id)}>{p.title}</button></td><td>{normalizedSalaryLabel(p)}<span className="source-original-salary">{p.raw}</span></td></tr>)}
       </tbody></table></div>{!sourceVacancies.length && <EmptyState title="Источников нет" description="В этой выборке нет вакансий с данными для показателя." />}</div></TabsContent>
       <TabsContent value="vacancies">{metric && <div className="source-metric"><Button variant="ghost" size="sm" onClick={() => { setMetric(undefined); setSelectedId(undefined); setTab('data'); }}><ArrowLeft data-icon="inline-start" />Все показатели</Button><strong>{metric.label}</strong>{context?.filterDimension && <Button size="sm" variant="outline" onClick={() => onFilter(context.filterDimension!, metric.label)}>Применить как фильтр</Button>}</div>}<VacancyBrowser key={`${context?.title}-${metric?.key || ''}`} vacancies={sourceVacancies} initialId={selectedId} metric={metric} dimension={context?.dimension} /></TabsContent>
     </Tabs>

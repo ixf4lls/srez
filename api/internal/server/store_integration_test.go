@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,7 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"strings"
 	"testing"
 	"time"
 )
@@ -54,7 +52,7 @@ func isolatedStore(t *testing.T) *Store {
 	return store
 }
 
-func TestBulkDeleteRestoreAndConcurrentSave(t *testing.T) {
+func TestSingleDeleteRestoreAndConcurrentSave(t *testing.T) {
 	store := isolatedStore(t)
 	ctx := context.Background()
 	ids := []string{"aaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbb"}
@@ -69,14 +67,20 @@ func TestBulkDeleteRestoreAndConcurrentSave(t *testing.T) {
 	}
 	app := New(store, NewRunner("http://unused.invalid"))
 	request := func(path string) *httptest.ResponseRecorder {
-		body, _ := json.Marshal(map[string]any{"ids": []string{ids[0], ids[1], ids[0]}})
 		w := httptest.NewRecorder()
-		app.Handler().ServeHTTP(w, httptest.NewRequest("POST", path, strings.NewReader(string(body))))
+		app.Handler().ServeHTTP(w, httptest.NewRequest("POST", path, nil))
 		return w
 	}
-	deleted := request("/api/analyses/delete")
-	if deleted.Code != 200 {
-		t.Fatalf("delete: %d %s", deleted.Code, deleted.Body.String())
+	for i, id := range ids {
+		deleted := request("/api/analyses/" + id + "/delete")
+		if deleted.Code != 200 {
+			t.Fatalf("delete: %d %s", deleted.Code, deleted.Body.String())
+		}
+		if i == 0 {
+			if _, err := store.Get(ctx, ids[1]); err != nil {
+				t.Fatalf("deleting one analysis affected another: %v", err)
+			}
+		}
 	}
 	rows, err := store.List(ctx)
 	if err != nil || len(rows) != 0 {
@@ -96,8 +100,10 @@ func TestBulkDeleteRestoreAndConcurrentSave(t *testing.T) {
 	if err = store.Save(ctx, &stale); !errors.Is(err, ErrDeleted) {
 		t.Fatalf("stale worker resurrected deleted search: %v", err)
 	}
-	if restored := request("/api/analyses/restore"); restored.Code != 200 {
-		t.Fatalf("restore: %s", restored.Body.String())
+	for _, id := range ids {
+		if restored := request("/api/analyses/" + id + "/restore"); restored.Code != 200 {
+			t.Fatalf("restore: %s", restored.Body.String())
+		}
 	}
 	rows, err = store.List(ctx)
 	if err != nil || len(rows) != 2 {

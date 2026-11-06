@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, Check, ChevronDown, Database, Expand, LoaderCircle, Pause, Play, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Check, ChevronDown, Database, Expand, LoaderCircle, Pause, Play, RefreshCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
 import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api, date, isActive, number } from '../types';
 import type { Analysis, Metric, Report, Vacancy } from '../types';
 import { deriveReport, dimensions, filterVacancies, readViewFilters, salaryGroups } from '../analytics';
-import type { Dimension, ViewFilters } from '../analytics';
+import type { Dimension, SalaryRates, ViewFilters } from '../analytics';
 import { Explorer } from './Explorer';
 import type { Exploration } from './Explorer';
 import { ResponsePlot, SalaryPlot } from './VacancyCharts';
 import { VacancyBrowser } from './Vacancies';
 import { EmptyState, ErrorNotice, LoadingState, StatusBadge } from './AppUI';
+import { DeleteAnalysisDialog } from './DeleteAnalysisDialog';
+
+type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
 
 export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string; navigate: (s: string) => void; onRepeat: (a: Analysis) => void; onChanged: () => void }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -29,7 +31,10 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   const [actionLoading, setActionLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<ViewFilters>(readViewFilters);
-  const [salaryKey, setSalaryKey] = useState('');
+  const [rates, setRates] = useState<RatesResponse | null>(null);
+  const [ratesLoading, setRatesLoading] = useState(true);
+  const [ratesError, setRatesError] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [tab, setTab] = useState('overview');
   const previousStatus = useRef<string | undefined>(undefined);
   const active = analysis ? isActive(analysis) : false;
@@ -42,6 +47,13 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
     catch (e) { setVacancyError((e as Error).message); }
   }
   useEffect(() => { void refresh(); }, [id]);
+  async function loadRates() {
+    setRatesLoading(true); setRatesError('');
+    try { setRates(await api<RatesResponse>('/rates')); }
+    catch (e) { setRatesError((e as Error).message); }
+    finally { setRatesLoading(false); }
+  }
+  useEffect(() => { void loadRates(); }, []);
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => void refresh(), 1500);
@@ -66,8 +78,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   const loadedTotal = vacancies.filter(v => v.loaded).length;
   const filtered = Object.values(filters).some(values => values?.length);
   const r = useMemo(() => analysis?.report && vacanciesLoaded ? deriveReport(analysis.report, scoped) : null, [analysis?.report, scoped, vacanciesLoaded]);
-  const salaries = useMemo(() => salaryGroups(scoped), [scoped]);
-  const salaryGroup = salaries.find(g => g.key === salaryKey) || salaries[0];
+  const salaryGroup = useMemo(() => salaryGroups(scoped, rates?.rates || { RUB: 1 })[0], [scoped, rates]);
   const unfilteredReport = useMemo(() => analysis?.report && vacanciesLoaded ? deriveReport(analysis.report, vacancies) : null, [analysis?.report, vacancies, vacanciesLoaded]);
   function toggleFilter(dimension: Dimension, value: string) {
     setFilters(previous => {
@@ -93,7 +104,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   const breakdowns = (report: Report) => <div className="breakdown-stack">{dimensions.map(({ key, title }) => <Breakdown key={key} title={title} dimension={key} metrics={report.dimensions[key] || []} selected={filters[key] || []} onToggle={value => toggleFilter(key, value)} onSources={() => { setShowFilters(false); setExploration({ title, dimension: key === 'format' ? 'workFormats' : key, metrics: report.dimensions[key] || [], filterDimension: key }); }} />)}</div>;
 
   return <>
-    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date">{date(a.createdAt)} МСК<span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" onClick={() => onRepeat(a)}><RefreshCw data-icon="inline-start" />Повторить поиск</Button>{canResume && <Button disabled={actionLoading} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}</div></section>
+    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date">{date(a.createdAt)} МСК<span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" onClick={() => onRepeat(a)}><RefreshCw data-icon="inline-start" />Повторить поиск</Button>{canResume && <Button disabled={actionLoading} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}<Button variant="ghost" className="text-text-destructive" onClick={() => setDeleting(true)}><Trash2 data-icon="inline-start" />Удалить анализ</Button></div></section>
     <details className="report-query"><summary>Параметры запроса<ChevronDown size={14} aria-hidden="true" /></summary><div><code>{a.expression}</code><div className="query-conditions">{Object.entries(a.filters).filter(([, value]) => value).map(([key, value]) => <Badge variant="outline" key={key}>{a.filterLabels?.[key] || value}</Badge>)}</div></div></details>
     {error && <ErrorNotice retry={() => void refresh()}>{error}</ErrorNotice>}
     {!active && a.error && <div className="data-notice"><strong>{a.message}</strong><p>{a.error.replace(/^\w+:\s*/, '')}</p>{/auth|blocked/.test(a.error) && <p>Обновите сессию hh.ru через <code>api-anything login hh --window</code>, затем продолжите сбор.</p>}</div>}
@@ -105,8 +116,11 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
         <div className="report-filterbar"><div className="sample-count"><strong data-testid="vacancy-count">{number(r.total)}</strong><span>{filtered ? `из ${number(loadedTotal)} вакансий` : 'вакансий в выборке'}</span></div><div className="active-filters">{dimensions.flatMap(({ key, title }) => (filters[key] || []).map(value => <button className="filter-chip" key={`${key}-${value}`} onClick={() => toggleFilter(key, value)} aria-label={`Убрать фильтр ${title}: ${value}`}><span>{value}</span><X size={12} /></button>))}</div>{filtered && <Button variant="ghost" size="sm" onClick={() => setFilters({})}>Сбросить</Button>}<Button variant="outline" size="sm" onClick={() => setShowFilters(true)}><SlidersHorizontal data-icon="inline-start" />Фильтры</Button></div>
         <Tabs value={tab} onValueChange={setTab} variant="line" className="report-tabs"><TabsList variant="line" aria-label="Разделы отчёта"><TabsTrigger value="overview">Обзор</TabsTrigger><TabsTrigger value="requirements">Навыки и требования</TabsTrigger><TabsTrigger value="vacancies">Вакансии <span className="tab-count">{number((filtered ? scoped : vacancies).length)}</span></TabsTrigger></TabsList>
           <TabsContent value="overview">{r.total ? <div className="report-overview"><div className="series-stack">
-            <Card data-testid="salary-chart"><CardHeader className="chart-card-header"><div><CardTitle>Зарплаты</CardTitle><CardDescription>Предложения по каждой вакансии</CardDescription></div><IconButton variant="ghost" aria-label="Развернуть график зарплат" disabled={!salaryGroup} onClick={() => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup?.points, salaryLabel: salaryGroup?.label, expanded: true })}><Expand /></IconButton></CardHeader><CardContent>
-              {salaryGroup ? <><label className="salary-group-select form-field"><span>Валюта, период и налоги</span><NativeSelect value={salaryGroup.key} onChange={e => setSalaryKey(e.target.value)}>{salaries.map(g => <option key={g.key} value={g.key}>{g.label} ({g.points.length})</option>)}</NativeSelect></label><SalaryPlot points={salaryGroup.points} onChoose={vacancyId => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup.points, salaryLabel: salaryGroup.label, vacancyId })} /><div className="chart-footer"><span>Указаны в {number(salaryGroup.points.length)} из {number(r.total)} вакансий</span><Button variant="ghost" size="xs" onClick={() => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup.points, salaryLabel: salaryGroup.label })}><Database data-icon="inline-start" />Источники</Button></div></> : <EmptyState title="Зарплаты не указаны" description="В выбранных вакансиях нет распознаваемых зарплатных предложений." />}
+            <Card data-testid="salary-chart"><CardHeader className="chart-card-header"><div><CardTitle>Зарплаты</CardTitle><CardDescription>Рубли в месяц, на руки</CardDescription></div><IconButton variant="ghost" aria-label="Развернуть график зарплат" disabled={!salaryGroup} onClick={() => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup?.points, salaryLabel: salaryGroup?.label, expanded: true })}><Expand /></IconButton></CardHeader><CardContent>
+              {ratesLoading && <p className="field-hint" role="status">Обновляем курсы валют…</p>}
+              {ratesError && <div className="salary-rate-notice"><p>Курсы валют недоступны. Показаны предложения в рублях.</p><Button size="xs" variant="outline" onClick={() => void loadRates()}>Обновить курсы</Button></div>}
+              {salaryGroup ? <><SalaryPlot points={salaryGroup.points} onChoose={vacancyId => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup.points, salaryLabel: salaryGroup.label, vacancyId })} /><div className="chart-footer"><span>Сопоставимы {number(salaryGroup.points.length)} из {number(r.total)} вакансий</span><Button variant="ghost" size="xs" onClick={() => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup.points, salaryLabel: salaryGroup.label })}><Database data-icon="inline-start" />Источники</Button></div></> : <EmptyState title="Нет сопоставимых зарплат" description="Для пересчёта нужны сумма, валюта, период оплаты и отметка о налогах." />}
+              <details className="salary-method"><summary>Как рассчитано<ChevronDown size={13} aria-hidden="true" /></summary><div><p>Суммы приведены к рублям за месяц. Из gross вычтен НДФЛ резидента РФ по прогрессивной шкале, исходя из одинакового дохода в течение года, без вычетов. Это расчётная оценка.</p><p>Для часовых ставок приняты 176 часов в месяц, для дневных: 22 рабочих дня. Недельные суммы умножены на 52/12, годовые разделены на 12. Предложения без периода, налогового статуса или доступного курса исключены из графика.</p>{rates && <p><a href={rates.sourceUrl} target="_blank" rel="noreferrer">Курсы Банка России на {rates.date.split('-').reverse().join('.')}</a>{rates.stale ? ' (сохранённые данные, обновить сейчас не удалось)' : ''}.</p>}<a href="https://www.nalog.gov.ru/rn39/promo/nu/" target="_blank" rel="noreferrer">Шкала НДФЛ: ФНС России</a></div></details>
             </CardContent></Card>
             <Card data-testid="response-chart"><CardHeader className="chart-card-header"><div><CardTitle>Отклики</CardTitle><CardDescription>Число откликов на каждую вакансию</CardDescription></div><IconButton variant="ghost" aria-label="Развернуть график откликов" disabled={!r.responses.length} onClick={() => setExploration({ title: 'Отклики', dimension: 'responses', points: r.responses, mean: r.responseMean, expanded: true })}><Expand /></IconButton></CardHeader><CardContent>
               {r.responses.length ? <><div className="chart-stat"><strong>{r.responseMean == null ? 'Нет данных' : number(r.responseMean)}</strong><span>откликов в среднем</span></div><ResponsePlot points={r.responses} mean={r.responseMean} onChoose={vacancyId => setExploration({ title: 'Отклики', dimension: 'responses', points: r.responses, vacancyId })} /><div className="chart-footer"><span>Данные по {number(r.responseCoverage)} из {number(r.total)} вакансий</span><Button variant="ghost" size="xs" onClick={() => setExploration({ title: 'Отклики', dimension: 'responses', points: r.responses })}><Database data-icon="inline-start" />Источники</Button></div></> : <EmptyState title="Нет данных об откликах" description="В сохранённых вакансиях число откликов недоступно." />}
@@ -120,6 +134,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
       </>}
     </>}
     <Explorer context={exploration} vacancies={filtered ? scoped : vacancies} onClose={() => setExploration(null)} onFilter={applySourceFilter} />
+    <DeleteAnalysisDialog analysis={deleting ? a : null} onClose={() => setDeleting(false)} onDeleted={() => { setDeleting(false); onChanged(); navigate('/history'); }} />
     <Button variant="ghost" size="sm" className="back-to-history" onClick={() => navigate('/history')}><ArrowLeft data-icon="inline-start" />История анализов</Button>
   </>;
 }

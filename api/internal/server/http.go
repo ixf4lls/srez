@@ -17,12 +17,15 @@ import (
 )
 
 type Server struct {
-	Store     *Store
-	Runner    *Runner
-	Jobs      *Jobs
-	filtersMu sync.Mutex
-	filters   json.RawMessage
-	filtersAt time.Time
+	Store         *Store
+	Runner        *Runner
+	Jobs          *Jobs
+	filtersMu     sync.Mutex
+	filters       json.RawMessage
+	filtersAt     time.Time
+	ratesState    currencyRatesCache
+	ratesEndpoint string
+	ratesClient   *http.Client
 }
 
 func New(s *Store, r *Runner) *Server { return &Server{Store: s, Runner: r, Jobs: NewJobs(s, r)} }
@@ -58,8 +61,8 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /api/prepare", s.prepare)
 	m.HandleFunc("GET /api/analyses", s.list)
 	m.HandleFunc("POST /api/analyses", s.create)
-	m.HandleFunc("POST /api/analyses/delete", s.deleteAnalyses)
-	m.HandleFunc("POST /api/analyses/restore", s.restoreAnalyses)
+	m.HandleFunc("POST /api/analyses/{id}/delete", s.deleteAnalysis)
+	m.HandleFunc("POST /api/analyses/{id}/restore", s.restoreAnalysis)
 	m.HandleFunc("GET /api/analyses/{id}", s.get)
 	m.HandleFunc("GET /api/analyses/{id}/vacancies", s.vacancies)
 	m.HandleFunc("POST /api/analyses/{id}/cancel", s.cancel)
@@ -141,57 +144,45 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, v)
 }
 
-func analysisIDs(w http.ResponseWriter, r *http.Request) ([]string, bool) {
-	var input struct {
-		IDs []string `json:"ids"`
-	}
-	if !decode(w, r, &input) {
-		return nil, false
-	}
-	if len(input.IDs) == 0 || len(input.IDs) > 1000 {
-		fail(w, 400, "Выберите от 1 до 1000 анализов")
-		return nil, false
-	}
-	seen := map[string]bool{}
-	ids := []string{}
-	for _, id := range input.IDs {
-		if !regexp.MustCompile(`^[a-f0-9]{24}$`).MatchString(id) {
-			fail(w, 400, "Некорректный идентификатор анализа")
-			return nil, false
-		}
-		if !seen[id] {
-			seen[id] = true
-			ids = append(ids, id)
-		}
-	}
-	return ids, true
-}
-func (s *Server) deleteAnalyses(w http.ResponseWriter, r *http.Request) {
-	ids, ok := analysisIDs(w, r)
-	if !ok {
+func (s *Server) deleteAnalysis(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validAnalysisID(w, id) {
 		return
 	}
-	changed, err := s.Store.SetDeleted(r.Context(), ids, true)
+	changed, err := s.Store.SetDeleted(r.Context(), []string{id}, true)
 	if err != nil {
-		fail(w, 500, "Не удалось удалить анализы")
+		fail(w, 500, "Не удалось удалить анализ")
 		return
 	}
-	for _, id := range changed {
-		s.Jobs.Cancel(id)
+	if len(changed) == 0 {
+		fail(w, 404, "Анализ не найден")
+		return
 	}
+	s.Jobs.Cancel(id)
 	write(w, 200, map[string]any{"deleted": changed})
 }
-func (s *Server) restoreAnalyses(w http.ResponseWriter, r *http.Request) {
-	ids, ok := analysisIDs(w, r)
-	if !ok {
+func (s *Server) restoreAnalysis(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validAnalysisID(w, id) {
 		return
 	}
-	changed, err := s.Store.SetDeleted(r.Context(), ids, false)
+	changed, err := s.Store.SetDeleted(r.Context(), []string{id}, false)
 	if err != nil {
-		fail(w, 500, "Не удалось восстановить анализы")
+		fail(w, 500, "Не удалось восстановить анализ")
+		return
+	}
+	if len(changed) == 0 {
+		fail(w, 404, "Анализ не найден")
 		return
 	}
 	write(w, 200, map[string]any{"restored": changed})
+}
+func validAnalysisID(w http.ResponseWriter, id string) bool {
+	if !regexp.MustCompile(`^[a-f0-9]{24}$`).MatchString(id) {
+		fail(w, 400, "Некорректный идентификатор анализа")
+		return false
+	}
+	return true
 }
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
