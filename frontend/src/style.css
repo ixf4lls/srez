@@ -148,6 +148,7 @@
 .chart-stat>span { color: var(--muted-foreground); font-size: .75rem; }
 .response-chart { width: 100%; min-width: 0; }
 .chart-axis-caption { color: var(--muted-foreground); font-size: .75rem; margin: 0 0 .25rem .5rem; }
+.chart-index-caption { color: var(--muted-foreground); font-size: .75rem; text-align: end; margin-top: .25rem; }
 .chart-legend-note { color: var(--muted-foreground); font-size: .75rem; margin-top: .5rem; }
 .expanded-bars { overflow-x: auto; width: 100%; }
 .chart-segment, .response-point { cursor: pointer; }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deriveReport,filterVacancies,netFromGross,normalizeSalary,normalizedSalaryLabel,parseSalary,salaryGroups,workFormats} from './analytics.ts';
+import {deriveReport,filterVacancies,netFromGross,normalizeSalary,normalizedSalaryLabel,parseSalary,salaryAxis,salaryGroups,workFormats} from './analytics.ts';
 import type {Report,Vacancy} from './types.ts';
 
 const vacancy=(id:string,values:Partial<Vacancy>={}):Vacancy=>({id,url:`https://hh.ru/vacancy/${id}`,title:`Job ${id}`,company:'Example',salary:'',city:'Москва',address:'Москва',experience:'1–3 года',workFormats:['на месте работодателя, удалённо или гибрид'],format:'Офис / Гибрид / Удалённо',grade:'Middle',employment:'',workSchedule:'',workingHours:'',description:'',keySkills:[],responseCount:null,publishedAt:'',collectedAt:'2026-11-01T09:00:00Z',loaded:true,requirements:[],...values});
@@ -75,4 +75,29 @@ test('additional currencies and annual amounts preserve original bounds while co
  assert.equal(parseSalary('1000 R$ за месяц, на руки')?.currency,'BRL');
  assert.deepEqual(normalizeSalary(parseSalary('1 200 000 ₽ за год, на руки')!,{RUB:1}),[100000,100000]);
  assert.deepEqual(normalizeSalary(parseSalary('от 100 до 200 KZT за месяц, на руки')!,{KZT:.2}),[20,40]);
+});
+
+test('salary axis uses one unit and a linear scale covering every salary bound',()=>{
+ for(const maximum of [0,1,20,999,1000,59682,456758,900000,999999,1000000,1200000,9000000,30000000]){
+  const axis=salaryAxis(maximum);
+  assert.equal(axis.domain[0],0);
+  assert.ok(axis.domain[1]>=maximum);
+  assert.equal(axis.ticks[0],0);
+  assert.equal(axis.ticks.at(-1),axis.domain[1]);
+  assert.ok(axis.ticks.length>=2&&axis.ticks.length<=5);
+  const step=axis.ticks[1];
+  assert.ok(axis.ticks.every((value,index)=>Math.abs(value-index*step)<.000001));
+  const labels=axis.ticks.map(axis.formatTick);
+  assert.equal(new Set(labels).size,labels.length);
+  assert.ok(labels.every(label=>!/[а-я]/i.test(label)));
+ }
+ const thousands=salaryAxis(456758);
+ assert.equal(thousands.caption,'тыс. ₽ в месяц, на руки');
+ assert.deepEqual(thousands.ticks.map(thousands.formatTick),['0','150','300','450','600']);
+ const millions=salaryAxis(1200000);
+ assert.equal(millions.caption,'млн ₽ в месяц, на руки');
+ assert.deepEqual(millions.ticks.map(millions.formatTick),['0','0,5','1','1,5']);
+ assert.deepEqual(salaryAxis(900000).ticks.map(salaryAxis(900000).formatTick),['0','0,25','0,5','0,75','1']);
+ assert.deepEqual(salaryAxis(9000000).ticks.map(salaryAxis(9000000).formatTick),['0','2,5','5','7,5','10']);
+ assert.ok(Number.isFinite(salaryAxis(Infinity).domain[1]));
 });

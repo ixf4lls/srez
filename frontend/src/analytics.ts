@@ -86,6 +86,23 @@ export type SalaryRates = Record<string, number>;
 export type SalaryPoint = Salary & {id:string;title:string;range:[number,number];normalizedRange:[number,number];normalizedFrom:number|null;normalizedTo:number|null};
 export type SalaryGroup = {key:string;label:string;points:SalaryPoint[]};
 
+export function salaryAxis(maximum:number) {
+  const max=Number.isFinite(maximum)&&maximum>0?maximum:1;
+  const magnitude=10**Math.floor(Math.log10(max/4));
+  const step=Math.max(1,[1,1.5,2,2.5,5,10].find(value=>value*magnitude>=max/4)!*magnitude);
+  const intervals=Math.ceil(max/step);
+  const upper=intervals*step;
+  const divisor=upper>=1_000_000?1_000_000:upper>=1000?1000:1;
+  const unit=divisor===1_000_000?'млн ₽':divisor===1000?'тыс. ₽':'₽';
+  const formatter=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:Math.log10(divisor)});
+  return {
+    domain:[0,upper] as [number,number],
+    ticks:Array.from({length:intervals+1},(_,index)=>index*step),
+    caption:`${unit} в месяц, на руки`,
+    formatTick:(value:number)=>formatter.format(value/divisor),
+  };
+}
+
 export function netFromGross(monthly:number):number {
   if(!Number.isFinite(monthly)||monthly<=0)return 0;
   const annual=monthly*12;
