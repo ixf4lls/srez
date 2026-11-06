@@ -1,11 +1,17 @@
-import {Suspense, lazy, useEffect, useState} from 'react';
-import {Plus} from './kitIcons';
-import type {Analysis} from './types';
-import {api, date, isActive, number, statusLabel} from './types';
-import {SearchForm} from './components/SearchForm';
-import {HistoryView} from './components/HistoryView';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
+import { ArrowLeft, ArrowUpRight, ChartNoAxesCombined, FileChartColumn, History, Menu, Moon, Plus, Sun } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from '@/components/ui/sidebar';
+import { api, date, isActive, statusLabel } from './types';
+import type { Analysis } from './types';
+import { SearchForm } from './components/SearchForm';
+import { HistoryView } from './components/HistoryView';
+import { EmptyState, LoadingState } from './components/AppUI';
 
-const AnalysisView = lazy(() => import('./components/AnalysisView').then(module => ({default: module.AnalysisView})));
+const AnalysisView = lazy(() => import('./components/AnalysisView').then(m => ({ default: m.AnalysisView })));
 
 export default function App() {
   const [path, setPath] = useState(location.pathname);
@@ -13,91 +19,79 @@ export default function App() {
   const [historyError, setHistoryError] = useState('');
   const [historyLoading, setHistoryLoading] = useState(true);
   const [repeat, setRepeat] = useState<Analysis | null>(null);
+  const [formKey, setFormKey] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+  const id = path.match(/^\/analyses\/([a-f0-9]+)$/)?.[1];
+  const current = analyses.find(a => a.id === id);
+  const page = id ? current?.title || 'Отчёт' : path === '/history' ? 'История анализов' : 'Новый анализ';
 
   function navigate(next: string) {
     history.pushState({}, '', next);
-    setPath(next);
-    window.scrollTo(0, 0);
+    setPath(next.split('?')[0]);
+    setMenuOpen(false);
+    window.scrollTo({ top: 0 });
   }
-
-  function openNewAnalysis() {
-    setRepeat(null);
-    if (path !== '/') navigate('/');
-    window.setTimeout(() => document.getElementById('market-query')?.focus(), 0);
+  function follow(event: MouseEvent<HTMLAnchorElement>, next: string) {
+    if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); navigate(next);
   }
-
+  function newAnalysis() {
+    setRepeat(null); setFormKey(k => k + 1); navigate('/');
+  }
+  async function refresh() {
+    try { setAnalyses(await api<Analysis[]>('/analyses')); setHistoryError(''); }
+    catch (e) { setHistoryError((e as Error).message); }
+    finally { setHistoryLoading(false); }
+  }
   useEffect(() => {
-    const onPop = () => setPath(location.pathname);
+    const onPop = () => { setPath(location.pathname); setMenuOpen(false); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-
-  const refresh = () => api<Analysis[]>('/analyses')
-    .then(items => { setAnalyses(items); setHistoryError(''); })
-    .catch(error => setHistoryError(error.message))
-    .finally(() => setHistoryLoading(false));
-
   useEffect(() => { void refresh(); }, [path]);
+  const hasActive = analyses.some(isActive);
   useEffect(() => {
-    if (!analyses.some(isActive)) return;
-    const timer = window.setInterval(() => void refresh(), 4000);
-    return () => window.clearInterval(timer);
-  }, [analyses.some(isActive)]);
+    if (!hasActive) return;
+    const timer = setInterval(() => void refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [hasActive]);
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    try { localStorage.setItem('srez-theme', dark ? 'dark' : 'light'); } catch { /* Storage can be disabled by the browser. */ }
+  }, [dark]);
+  useEffect(() => { document.title = `${page} · srez.`; }, [page]);
 
-  const id = path.match(/^\/analyses\/([a-f0-9]+)$/)?.[1];
-  const isHistory = path === '/history';
-  const recent = analyses.slice(0, 4);
+  const navigation = <>
+    <SidebarHeader className="brand-header">
+      <a className="wordmark" href="/" onClick={e => follow(e, '/')}>srez<span>.</span></a>
+      <p className="text-muted-foreground text-xs">Аналитика рынка вакансий</p>
+      <Button className="mt-5 w-full justify-start" onClick={newAnalysis}><Plus data-icon="inline-start" />Новый анализ</Button>
+    </SidebarHeader>
+    <SidebarContent>
+      <SidebarGroup><SidebarMenu><SidebarMenuItem><SidebarMenuButton asChild isActive={path === '/history'}><a href="/history" onClick={e => follow(e, '/history')}><History aria-hidden="true" /><span>История анализов</span><span className="ml-auto text-xs text-muted-foreground">{analyses.length || ''}</span></a></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
+      <SidebarGroup className="recent-navigation"><SidebarGroupLabel>Последние анализы</SidebarGroupLabel>
+        <SidebarMenu>{analyses.slice(0, 7).map(a => <SidebarMenuItem key={a.id}><SidebarMenuButton asChild isActive={a.id === id} className="recent-analysis-link"><a href={`/analyses/${a.id}`} onClick={e => follow(e, `/analyses/${a.id}`)} title={`${a.title}: ${statusLabel[a.status] || a.status}`}><FileChartColumn aria-hidden="true" /><span className="recent-analysis-copy"><span>{a.title}</span><small>{isActive(a) ? statusLabel[a.status] : date(a.createdAt).split(',')[0]}</small></span>{isActive(a) && <span className="activity-mark" aria-label={statusLabel[a.status]} />}</a></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
+        {!analyses.length && <p className="sidebar-hint">Сохранённые отчёты появятся здесь после первого анализа.</p>}
+        {historyError && <p className="sidebar-hint">Не удалось обновить историю. <button className="inline-link" onClick={() => void refresh()}>Повторить</button></p>}
+      </SidebarGroup>
+    </SidebarContent>
+    <SidebarFooter className="sidebar-bottom"><Button variant="ghost" className="justify-start" onClick={() => setDark(!dark)}>{dark ? <Sun data-icon="inline-start" /> : <Moon data-icon="inline-start" />}{dark ? 'Светлая тема' : 'Тёмная тема'}</Button><div className="sidebar-source"><span>Источник данных</span><a href="https://hh.ru" target="_blank" rel="noreferrer">hh.ru<ArrowUpRight size={12} aria-hidden="true" /></a></div></SidebarFooter>
+  </>;
 
-  return <div className="app-shell">
-    <header className="site-header">
-      <div className="header-inner">
-        <a className="brand" href="/" onClick={event => { event.preventDefault(); navigate('/'); }} aria-label="Srez home">Srez<span>.</span></a>
-        <nav className="main-nav" aria-label="Main navigation">
-          <a href="/" className={path === '/' ? 'active' : ''} aria-current={path === '/' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('/'); }}>Workspace</a>
-          <a href="/history" className={path === '/history' || id ? 'active' : ''} aria-current={path === '/history' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate('/history'); }}>History</a>
-        </nav>
-        <button type="button" className="button primary header-action" onClick={openNewAnalysis}><Plus size={18} aria-hidden="true"/>New analysis</button>
+  return <SidebarProvider style={{ '--sidebar-width': '15rem' } as CSSProperties}>
+    <a className="skip-link" href="#workspace">Перейти к содержимому</a>
+    <Sidebar collapsible="none"><nav className="sidebar-nav" aria-label="Основная навигация">{navigation}</nav></Sidebar>
+    <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetContent side="left" className="mobile-navigation" aria-describedby={undefined}><SheetHeader className="sr-only"><SheetTitle>Навигация srez.</SheetTitle></SheetHeader><nav className="sidebar-nav" aria-label="Мобильная навигация">{navigation}</nav></SheetContent></Sheet>
+    <SidebarInset className="min-w-0">
+      <header className="workspace-topbar"><IconButton variant="ghost" className="mobile-menu-button" aria-label="Открыть навигацию" onClick={() => setMenuOpen(true)}><Menu /></IconButton><span className="workspace-label"><ChartNoAxesCombined size={15} aria-hidden="true" />Рабочее пространство</span><span className="breadcrumb-divider">/</span><span className="breadcrumb-current">{page}</span></header>
+      <div id="workspace" className="workspace-content" tabIndex={-1}>
+        {id ? <Suspense fallback={<LoadingState text="Загружаем отчёт" />}><AnalysisView key={id} id={id} navigate={navigate} onChanged={() => void refresh()} onRepeat={a => { setRepeat(a); setFormKey(k => k + 1); navigate('/'); }} /></Suspense>
+          : path === '/history' ? <HistoryView analyses={analyses} loading={historyLoading} error={historyError} navigate={navigate} refresh={refresh} onNew={newAnalysis} />
+          : path === '/' ? <SearchForm key={formKey} initial={repeat} onCreated={a => { setRepeat(null); navigate(`/analyses/${a.id}`); }} />
+          : <EmptyState title="Страница не найдена" description="Откройте историю или начните новый анализ." action={<Button onClick={newAnalysis}><ArrowLeft data-icon="inline-start" />Новый анализ</Button>} />}
       </div>
-    </header>
-
-    <main className="main-content" id="main">
-      {id ? <Suspense fallback={<div className="empty-state large" role="status">Loading analysis…</div>}>
-        <AnalysisView key={id} id={id} navigate={navigate} onRepeat={analysis => { setRepeat(analysis); navigate('/'); }}/>
-      </Suspense> : isHistory ? <HistoryView analyses={analyses} loading={historyLoading} error={historyError} navigate={navigate} refresh={refresh} onNew={openNewAnalysis}/> : path === '/' ? <div className="home-page">
-        <section className="home-intro" aria-labelledby="home-title">
-          <div className="home-intro-copy">
-            <h1 id="home-title">Explore the vacancy market.</h1>
-            <p>Compare roles, salaries, skills and requirements from hh.ru listings. Open the vacancies behind every result.</p>
-          </div>
-          <div className="home-source" aria-label="Data source">
-            <span>DATA SOURCE</span>
-            <strong>hh.ru</strong>
-            <p>Reports are based on collected listings, with a link back to each original vacancy.</p>
-          </div>
-        </section>
-
-        <section className="home-search" id="new-analysis" aria-labelledby="new-analysis-title">
-          <div className="home-section-heading"><div><h2 id="new-analysis-title">Start an analysis</h2><p>Enter a role or technology stack, then review the search expression before collection starts.</p></div></div>
-          <SearchForm initial={repeat} onCreated={analysis => { setRepeat(null); navigate(`/analyses/${analysis.id}`); }}/>
-        </section>
-
-        <section className="home-explainer" aria-labelledby="home-explainer-title">
-          <div><h2 id="home-explainer-title">A clear path from query to evidence</h2><p>The report keeps its filters, source counts and original listings together, so you can check what each result means.</p></div>
-          <ol>
-            <li><span>01</span><div><strong>Shape the search</strong><p>Choose where terms should match, set filters and confirm the hh.ru expression.</p></div></li>
-            <li><span>02</span><div><strong>Inspect the result</strong><p>Filter the report, open a chart’s source data and read the matching vacancies.</p></div></li>
-          </ol>
-        </section>
-
-        <section className="recent-section" aria-labelledby="recent-title">
-          <div className="home-section-heading"><div><h2 id="recent-title">Recent analyses</h2><p>Your latest searches are kept in History.</p></div>{recent.length > 0 && <a className="text-link" href="/history" onClick={event => { event.preventDefault(); navigate('/history'); }}>View history</a>}</div>
-          {historyLoading ? <div className="home-recent-state" role="status">Loading recent analyses…</div> : historyError ? <div className="home-recent-state" role="alert"><span>Recent analyses could not be loaded. {historyError}</span><button type="button" className="text-link" onClick={() => void refresh()}>Try again</button></div> : recent.length ? <div className="recent-list">{recent.map(analysis => <a key={analysis.id} href={`/analyses/${analysis.id}`} onClick={event => { event.preventDefault(); navigate(`/analyses/${analysis.id}`); }}>
-            <span className="recent-title">{analysis.title}</span><span className="recent-date">{date(analysis.createdAt)}</span><span className="recent-count">{number(analysis.processed)} {analysis.processed === 1 ? 'listing' : 'listings'}</span><span className={`status-badge status-${analysis.status}`}>{statusLabel[analysis.status] || analysis.status}</span>
-          </a>)}</div> : <div className="home-recent-state">No analyses yet. Start with a role or technology stack above to create your first report.</div>}
-        </section>
-      </div> : <div className="empty-state large"><h1>Page not found</h1><p>This address does not match an analysis or a page in the app.</p><a className="button primary" href="/" onClick={event => { event.preventDefault(); navigate('/'); }}>Back to workspace</a></div>}
-    </main>
-
-    <footer className="site-footer"><span>Srez</span><span>Vacancy data from <a href="https://hh.ru" target="_blank" rel="noopener noreferrer">hh.ru</a></span></footer>
-  </div>;
+    </SidebarInset>
+  </SidebarProvider>;
 }
