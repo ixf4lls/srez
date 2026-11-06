@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
-import { ArrowLeft, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, History, Moon, Plus, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { api, isActive } from './types';
@@ -60,9 +60,9 @@ export default function App() {
 
   return <div className={`app-shell ${hero ? 'hero-shell' : ''}`}>
     <a className="skip-link" href="#main-content">Перейти к содержимому</a>
-    <header className="app-header"><a className="wordmark" href="/" onClick={newAnalysis} aria-label="srez. На главную">srez<span>.</span></a><nav aria-label="Основная навигация">
-      {!hero && <Button asChild variant="ghost"><a href="/" onClick={newAnalysis}>Новый анализ</a></Button>}
-      <Button asChild variant="ghost"><a href="/history" onClick={historyLink} aria-current={path === '/history' ? 'page' : undefined}>{hero ? 'ИСТОРИЯ' : 'История'}</a></Button>
+    <header className="app-header">{!hero && <a className="wordmark" href="/" onClick={newAnalysis} aria-label="srez. На главную">srez<span>.</span></a>}<nav aria-label="Основная навигация">
+      {!hero && <Button asChild><a href="/" onClick={newAnalysis}><Plus data-icon="inline-start" aria-hidden="true" />Новый анализ</a></Button>}
+      <Button asChild variant="ghost" className="history-nav"><a href="/history" onClick={historyLink} aria-current={path === '/history' ? 'page' : undefined}><History data-icon="inline-start" aria-hidden="true" />История</a></Button>
       <IconButton variant="ghost" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} title={dark ? 'Светлая тема' : 'Тёмная тема'} onClick={() => setDark(!dark)}>{dark ? <Sun /> : <Moon />}</IconButton>
     </nav></header>
     <main id="main-content" className={hero ? 'hero-main' : 'content-page'} tabIndex={-1}>
