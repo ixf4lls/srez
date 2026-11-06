@@ -263,7 +263,7 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
   .history-search { max-width: none; flex-basis: 100%; }
   .history-toolbar>.toolbar-select:nth-child(2) { margin-inline-start: 0; }
   .history-date { display: none; }
-  .analysis-name-cell>.mobile-row-date { display: block; }
+  .analysis-name-cell>.mobile-row-date { display: block; white-space: normal; }
   .requirements-grid { grid-template-columns: 1fr; }
   .vacancy-browser { grid-template-columns: minmax(15rem, .8fr) minmax(0, 1.2fr); }
 }
