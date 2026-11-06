@@ -57,7 +57,9 @@
 .query-summary>span { font-size: .75rem; color: var(--muted-foreground); }
 .query-summary strong { font-weight: 500; }
 .query-expression { font-family: var(--font-mono); line-height: 1.5rem; resize: vertical; min-height: 7rem; }
-.query-explanations { margin: 0; padding-inline-start: 1rem; list-style: disc; color: var(--muted-foreground); font-size: .75rem; line-height: 1.5rem; }
+.query-language-help { color: var(--muted-foreground); font-size: .75rem; line-height: 1.5rem; }
+.query-language-help a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+.query-language-help a:hover { color: var(--chart-4); }
 .skip-link { position: fixed; top: -5rem; left: 1rem; z-index: 100; padding: .75rem; border-radius: var(--radius-lg); background: var(--primary); color: var(--primary-foreground); }
 .skip-link:focus { top: 1rem; }
 .form-field { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, Check, LoaderCircle, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Popover, PopoverContent, PopoverHeader, PopoverTrigger } from '@/components/ui/popover';
@@ -66,11 +66,11 @@ export function SearchForm({ initial, onCreated }: { initial: Analysis | null; o
       {selected.length > 0 && <div className="selected-filter-list">{selected.map(([key, value]) => <button type="button" className="filter-chip" key={key} onClick={() => setFilters({ ...filters, [key]: '' })} aria-label={`Убрать фильтр ${groups.find(g => g.key === key)?.label || key}`}><span>{groups.find(g => g.key === key)?.options.find(o => o.value === value)?.label || initial?.filterLabels?.[key] || value}</span><X size={12} /></button>)}</div>}
       {error && !proposal && <ErrorNotice>{error}</ErrorNotice>}
     </form>
-    <Dialog open={!!proposal} onOpenChange={open => { if (!open && !starting) { setProposal(null); setError(''); } }}><DialogContent className="query-confirm-dialog"><DialogHeader><DialogTitle>Подтвердите запрос</DialogTitle><DialogDescription>Проверьте выражение для hh.ru. Его можно изменить перед запуском.</DialogDescription></DialogHeader>
-      <div className="query-summary"><span>Ваш запрос</span><strong>{query}</strong><span>{mode === 'roles' ? 'Поиск в названии вакансии' : 'Поиск во всём тексте'}</span></div>
+    <Dialog open={!!proposal} onOpenChange={open => { if (!open && !starting) { setProposal(null); setError(''); } }}><DialogContent className="query-confirm-dialog" aria-describedby="query-language-help"><DialogHeader><DialogTitle>Подтвердите запрос</DialogTitle></DialogHeader>
+      <div className="query-summary"><span>Ваш запрос</span><strong>{query}</strong></div>
       {selected.length > 0 && <div className="query-summary"><span>Условия поиска</span><p>{selected.map(([key, value]) => groups.find(g => g.key === key)?.options.find(o => o.value === value)?.label || initial?.filterLabels?.[key] || value).join(' · ')}</p></div>}
       <label className="form-field"><span>Выражение для hh.ru</span><Textarea autoFocus value={expression} onChange={e => setExpression(e.target.value)} rows={5} maxLength={3000} className="query-expression" /></label>
-      {!!proposal?.explanations?.length && <ul className="query-explanations">{proposal.explanations.map((text, i) => <li key={i}>{text}</li>)}</ul>}
+      <p className="query-language-help" id="query-language-help">Для оптимизации используется <a href="https://hh.ru/article/1175" target="_blank" rel="noreferrer">Язык запросов hh.ru</a></p>
       {error && <ErrorNotice>{error}</ErrorNotice>}
       <DialogFooter><Button variant="outline" disabled={starting} onClick={() => { setProposal(null); setError(''); }}>Назад</Button><Button disabled={starting || !expression.trim()} onClick={() => void start()}>{starting ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Check data-icon="inline-start" />}{starting ? 'Запускаем…' : 'Подтвердить и запустить'}</Button></DialogFooter>
     </DialogContent></Dialog>
