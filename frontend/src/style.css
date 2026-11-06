@@ -176,7 +176,8 @@
 .breakdown-track { grid-column: 1/-1; background: var(--muted); height: .25rem; border-radius: var(--radius-full); overflow: hidden; }
 .breakdown-track>span { display: block; height: 100%; border-radius: inherit; }
 .breakdown-row:hover .breakdown-label { text-decoration: underline; text-underline-offset: 3px; }
-.back-to-history { margin-top: 2rem; }
+.back-to-history { margin-bottom: 1.25rem; }
+.report-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .filter-sheet { overflow-y: auto; }
 .filter-sheet-content { padding: 0 1rem 2rem; }
 .filter-sheet-content>.field-hint { margin-bottom: 1.5rem; }
