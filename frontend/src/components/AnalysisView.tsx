@@ -1,10 +1,10 @@
 import {useEffect,useMemo,useState} from 'react';
-import {AlertCircle,ArrowLeft,ChevronRight,Clock3,Database,Expand,LoaderCircle,Pause,Play,RefreshCw,Search,ShieldCheck,SlidersHorizontal,X} from 'lucide-react';
+import {AlertCircle,ArrowLeft,ChevronRight,Clock3,Database,Expand,LoaderCircle,Pause,Play,RefreshCw,Search,ShieldCheck,X} from 'lucide-react';
 import {Cell,Pie,PieChart,ResponsiveContainer,Tooltip} from 'recharts';
 import {api,date,isActive,number,statusLabel} from '../types';
 import type {Analysis,Metric,Vacancy} from '../types';
-import {deriveReport,dimensions,filterVacancies,readViewFilters,salaryGroups} from '../analytics';
-import type {Dimension,ViewFilters} from '../analytics';
+import {deriveReport,dimensions,filterVacancies,fallbackSalaryRates,readViewFilters,salaryGroups} from '../analytics';
+import type {Dimension,SalaryRates,ViewFilters} from '../analytics';
 import {Explorer} from './Explorer';
 import type {Exploration} from './Explorer';
 import {ResponsePlot,SalaryPlot} from './VacancyCharts';
@@ -19,10 +19,12 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
   const [vacancyError,setVacancyError]=useState('');
   const [exploration,setExploration]=useState<Exploration|null>(null);
   const [actionLoading,setActionLoading]=useState(false);
+  const [refreshing,setRefreshing]=useState(false);
   const [reqKind,setReqKind]=useState('Обязательно');
   const [showQuery,setShowQuery]=useState(false);
   const [filters,setFilters]=useState<ViewFilters>(readViewFilters);
-  const [salaryKey,setSalaryKey]=useState('');
+  const [salaryRates,setSalaryRates]=useState<SalaryRates>(fallbackSalaryRates);
+  const [salaryRateState,setSalaryRateState]=useState<'loading'|'fresh'|'fallback'>('loading');
   const active=analysis?isActive(analysis):false;
   const refresh=async()=>{try{setAnalysis(await api<Analysis>(`/analyses/${id}`));setError('')}catch(e){setError((e as Error).message)}};
   const loadVacancies=async()=>{
@@ -33,6 +35,12 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
   useEffect(()=>{if(!active)return;const timer=setInterval(()=>void refresh(),1500);return()=>clearInterval(timer)},[id,active]);
   useEffect(()=>{if(analysis&&!active)void loadVacancies()},[analysis?.status,id]);
   useEffect(()=>{
+    let cancelled=false;
+    setSalaryRateState('loading');
+    api<{rates:SalaryRates}>('/rates').then(value=>{if(cancelled)return;setSalaryRates({...fallbackSalaryRates,...value.rates});setSalaryRateState('fresh')}).catch(()=>{if(!cancelled)setSalaryRateState('fallback')});
+    return()=>{cancelled=true};
+  },[id]);
+  useEffect(()=>{
     const url=new URL(location.href);
     if(Object.keys(filters).length)url.searchParams.set('view',JSON.stringify(filters));else url.searchParams.delete('view');
     history.replaceState({},'',url.pathname+url.search);
@@ -41,9 +49,10 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
   const scoped=useMemo(()=>filterVacancies(vacancies,filters),[vacancies,filters]);
   const loadedTotal=vacancies.filter(v=>v.loaded).length;
   const filtered=Object.values(filters).some(values=>values?.length);
+  const unfilteredReport=useMemo(()=>analysis?.report&&vacanciesLoaded?deriveReport(analysis.report,vacancies):null,[analysis?.report,vacancies,vacanciesLoaded]);
   const r=useMemo(()=>analysis?.report&&vacanciesLoaded?deriveReport(analysis.report,scoped):null,[analysis?.report,scoped,vacanciesLoaded]);
-  const salaries=useMemo(()=>salaryGroups(scoped),[scoped]);
-  const salaryGroup=salaries.find(g=>g.key===salaryKey)||salaries[0];
+  const salaries=useMemo(()=>salaryGroups(scoped,salaryRates),[scoped,salaryRates]);
+  const salaryGroup=salaries[0];
   const sourceVacancies=filtered?scoped:vacancies;
 
   function toggleFilter(dimension:Dimension,value:string|string[]) {
@@ -61,6 +70,14 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
   async function action(kind:'cancel'|'resume') {
     setActionLoading(true);try{await api(`/analyses/${id}/${kind}`,{});await refresh()}catch(e){setError((e as Error).message)}finally{setActionLoading(false)}
   }
+  async function refreshData() {
+    setRefreshing(true);setError('');setVacancyError('');
+    try {
+      const next=await api<Analysis>(`/analyses/${id}/refresh`,{});
+      setAnalysis(next);setVacancies([]);setVacanciesLoaded(false);setExploration(null);
+      if(!isActive(next))await loadVacancies();
+    } catch(e) {setError((e as Error).message)} finally {setRefreshing(false)}
+  }
   function openResponses(expanded=false) {
     if(r)setExploration({title:'Отклики',dimension:'responses',points:r.responses,expanded,mean:r.responseMean});
   }
@@ -77,9 +94,9 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
     <section className="analysis-heading">
       <div className="report-topline"><button className="text-button" onClick={()=>navigate('/history')}><ArrowLeft size={15}/>История</button><span className={`status-badge status-${a.status}`}>{active&&<LoaderCircle size={12} className="spin"/>}{statusLabel[a.status]}</span></div>
       <div className="report-heading"><div><h1>{a.title}</h1><div className="report-subtitle"><span><Clock3 size={14}/>{date(a.createdAt)} МСК</span><span>{a.mode==='roles'?'В названии':'Во всём тексте'}</span></div></div>
-        <div className="report-actions">{canResume&&<button className="button primary" disabled={actionLoading} onClick={()=>void action('resume')}>{actionLoading?<LoaderCircle size={15} className="spin"/>:<Play size={15}/>}Продолжить сбор</button>}<button className="button secondary" onClick={()=>onRepeat(a)}><RefreshCw size={15}/>Повторить поиск</button></div>
+        <div className="report-actions">{canResume&&<button className="button primary" disabled={actionLoading||refreshing} onClick={()=>void action('resume')}>{actionLoading?<LoaderCircle size={15} className="spin"/>:<Play size={15}/>}Продолжить сбор</button>}{!active&&<button className="button secondary" disabled={refreshing} onClick={()=>void refreshData()}>{refreshing?<LoaderCircle size={15} className="spin"/>:<RefreshCw size={15}/>}Актуализировать данные</button>}<button className="button secondary" disabled={refreshing} onClick={()=>onRepeat(a)}><Search size={15}/>Повторить поиск</button></div>
       </div>
-      <div className="report-query"><button onClick={()=>setShowQuery(!showQuery)} aria-expanded={showQuery}><Search size={14}/><span>Запрос</span><ChevronRight size={13} className={showQuery?'rotate-90':''}/></button><div className="report-filter-tags">{Object.entries(a.filters).filter(([,v])=>v).map(([key,value])=><span className="tag" key={key}>{a.filterLabels?.[key]||value}</span>)}</div>{showQuery&&<code>{a.expression}</code>}</div>
+      <div className="report-query"><button onClick={()=>setShowQuery(!showQuery)} aria-expanded={showQuery}><Search size={14}/><span>Запрос</span><ChevronRight size={13} className={showQuery?'rotate-90':''}/></button><div className="report-filter-tags">{Object.entries(a.filters).filter(([,v])=>v).map(([key,value])=><span className="tag" key={key}>{a.filterLabels?.[key]||value}</span>)}{a.excludeWords&&<span className="tag">Исключить: {a.excludeWords}</span>}</div>{showQuery&&<code>{a.expression}</code>}</div>
     </section>
 
     {error&&<div className="notice error" role="alert"><AlertCircle size={17}/>{error}</div>}
@@ -87,7 +104,7 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
     {active?<Progress analysis={a} onCancel={()=>void action('cancel')} loading={actionLoading}/>:<>
       {vacancyError?<div className="notice error" role="alert">{vacancyError}<button onClick={()=>void loadVacancies()}>Повторить загрузку</button></div>:!vacanciesLoaded?<div className="empty-state"><LoaderCircle size={20} className="spin"/>Загрузка вакансий…</div>:null}
       {r&&<>
-        {a.warnings?.length>0&&<details className="coverage-notice"><summary><ShieldCheck size={15}/>Загружено: {number(a.processed)} из {number(a.found||a.collected)}<ChevronRight size={14}/></summary><ul>{[...new Set(a.warnings)].map((warning,i)=><li key={i}>{warning}</li>)}</ul></details>}
+        {(a.warnings?.length>0||(a.skipped??0)>0)&&<details className="coverage-notice"><summary><ShieldCheck size={15}/>Загружено: {number(a.processed)} из {number(a.found||a.collected)}{a.skipped?` · уже обработано: ${number(a.skipped)}`:''}<ChevronRight size={14}/></summary><ul>{(a.skipped??0)>0&&<li>Уже разобранные вакансии пропущены на этапе сбора ссылок.</li>}{[...new Set(a.warnings||[])].map((warning,i)=><li key={i}>{warning}</li>)}</ul></details>}
         <section className="analysis-filterbar" aria-label="Фильтры отчёта">
           <div className="vacancy-count"><strong data-testid="vacancy-count">{number(r.total)}</strong><span>{filtered?`из ${number(loadedTotal)} вакансий`:'вакансий'}</span>{!filtered&&a.found>loadedTotal&&<small>из {number(a.found)} найденных</small>}</div>
           <div className="view-filter-chips">{dimensions.flatMap(({key,title})=>(filters[key]||[]).map(value=><button className="view-filter-chip" key={`${key}:${value}`} onClick={()=>removeFilter(key,value)} aria-label={`Убрать фильтр ${title}: ${value}`}><span>{title}:</span>{value}<X size={13}/></button>))}</div>
@@ -95,8 +112,9 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
         </section>
 
         {r.total>0?<div className="report-panels">
-          <div className="dimensions-grid">{dimensions.map(({key,title})=>{
-            const data=r.dimensions[key]||[];
+          <EmploymentFormatStats report={r} availableMetrics={unfilteredReport?.dimensions.employmentForm} selected={filters.employmentForm||[]} onToggle={value=>toggleFilter('employmentForm',value)} />
+          <div className="dimensions-grid">{dimensions.filter(({key})=>key!=='employmentForm').map(({key,title})=>{
+            const data=scopedMetrics(r.dimensions[key]||[],unfilteredReport?.dimensions[key]||[]);
             const context={title,dimension:key==='format'?'workFormats':key,metrics:data,filterDimension:key};
             return <article className="chart-card" key={key} data-testid={`dimension-${key}`}>
               <div className="card-heading"><h3>{title}</h3>{key==='format'&&<span className="chart-meta" title="Каждая вакансия учитывается в каждом указанном формате; сумма долей может превышать 100%">С пересечениями</span>}<button className="icon-button" aria-label={`Развернуть: ${title}`} onClick={()=>setExploration({...context,expanded:true})}><Expand size={15}/></button></div>
@@ -113,7 +131,7 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
             <button className="card-source" onClick={()=>openResponses()}><Database size={13}/>Исходные данные</button>
           </article>
 
-          <article className="chart-card vacancy-series-card" data-testid="salary-chart"><div className="card-heading"><h3>Зарплаты</h3>{salaryGroup&&<>{salaries.length>1?<select className="salary-unit-select" aria-label="Валюта, период и налоги" value={salaryGroup.key} onChange={e=>setSalaryKey(e.target.value)}>{salaries.map(group=><option value={group.key} key={group.key}>{group.label} ({group.points.length})</option>)}</select>:<span className="chart-meta">{salaryGroup.label}</span>}<span className="chart-meta">{number(salaryGroup.points.length)} / {number(r.total)}</span></>}<button className="icon-button" disabled={!salaryGroup} aria-label="Развернуть график зарплат" onClick={()=>openSalary(true)}><Expand size={15}/></button></div>
+          <article className="chart-card vacancy-series-card" data-testid="salary-chart"><div className="card-heading"><h3>Зарплаты</h3>{salaryGroup&&<><span className="chart-meta">{salaryGroup.label}</span><span className="chart-meta">{number(salaryGroup.points.length)} / {number(r.total)}</span>{salaryRateState==='fallback'&&<span className="chart-meta" title="Текущий курс ЦБ РФ недоступен, показан резервный курс">Резервный курс</span>}</>}<button className="icon-button" disabled={!salaryGroup} aria-label="Развернуть график зарплат" onClick={()=>openSalary(true)}><Expand size={15}/></button></div>
             {salaryGroup?<SalaryPlot points={salaryGroup.points} onChoose={vacancyId=>setExploration({title:'Зарплаты',dimension:'salary',salaries:salaryGroup.points,salaryLabel:salaryGroup.label,vacancyId})}/>:<div className="empty-state compact">Зарплаты не указаны</div>}
             {salaryGroup&&<button className="card-source" onClick={()=>openSalary()}><Database size={13}/>Исходные данные</button>}
           </article>
@@ -121,7 +139,7 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
           <div className="rankings-grid"><Ranking title="Ключевые навыки" metrics={r.skills} coverage={r.skillsCoverage<r.total?`${r.skillsCoverage} / ${r.total}`:undefined} onOpen={metric=>setExploration({title:'Ключевые навыки',metrics:r.skills,metric})} onAll={()=>setExploration({title:'Ключевые навыки',metrics:r.skills})} color="purple"/>
             <Ranking title="Требования" metrics={requirements} coverage={r.requirementsCoverage<r.total?`${r.requirementsCoverage} / ${r.total}`:undefined} onOpen={metric=>setExploration({title:'Требования',metrics:r.requirements,metric})} onAll={()=>setExploration({title:'Требования',metrics:r.requirements})} color="mint"><div className="requirement-tabs"><button className={reqKind==='Обязательно'?'selected':''} onClick={()=>setReqKind('Обязательно')}>Обязательно</button><button className={reqKind==='Будет плюсом'?'selected':''} onClick={()=>setReqKind('Будет плюсом')}>Будет плюсом</button></div></Ranking>
           </div>
-        </div>:<div className="empty-state large"><h2>{filtered?'Нет вакансий по выбранным фильтрам':a.collected?'Нет загруженных вакансий':'Вакансии не найдены'}</h2>{filtered&&<button className="button secondary" onClick={()=>setFilters({})}>Сбросить фильтры</button>}</div>}
+        </div>:<><EmploymentFormatStats report={r} availableMetrics={unfilteredReport?.dimensions.employmentForm} selected={filters.employmentForm||[]} onToggle={value=>toggleFilter('employmentForm',value)} /><div className="empty-state large"><h2>{filtered?'Нет вакансий по выбранным фильтрам':(a.skipped??0)>0?'Все найденные вакансии уже разобраны в других анализах':a.collected?'Нет загруженных вакансий':'Вакансии не найдены'}</h2>{filtered&&<button className="button secondary" onClick={()=>setFilters({})}>Сбросить фильтры</button>}</div></>}
         <div className="all-vacancies-cta"><button className="button primary" onClick={()=>setExploration({title:filtered?'Вакансии по фильтрам':'Все вакансии',all:true})}>Посмотреть найденные вакансии ({number(sourceVacancies.length)})</button></div>
       </>}
     </>}
@@ -131,4 +149,24 @@ export function AnalysisView({id,navigate,onRepeat}:{id:string;navigate:(s:strin
 
 function otherMetric(data:Metric[]):Metric {return {key:'other',label:'Другие',count:data.reduce((sum,x)=>sum+x.count,0),percent:data.reduce((sum,x)=>sum+x.percent,0),vacancyIds:data.flatMap(x=>x.vacancyIds),evidence:data.flatMap(x=>x.evidence)}}
 function Ranking({title,metrics,coverage,onOpen,onAll,color,children}:{title:string;metrics:Metric[];coverage?:string;onOpen:(m:Metric)=>void;onAll:()=>void;color:string;children?:React.ReactNode}) {return <article className="chart-card ranking-card"><div className="card-heading"><h3>{title}</h3>{coverage&&<span className="chart-meta">{coverage}</span>}<button className="icon-button" aria-label={`Развернуть: ${title}`} onClick={onAll}><Expand size={15}/></button></div>{children}<div className="ranking-list">{metrics.slice(0,8).map(metric=><button className="ranking-row" key={metric.key} onClick={()=>onOpen(metric)}><div><div className="rank-label"><strong>{metric.label}</strong><span>{number(metric.percent)}<small>%</small></span></div><div className="rank-track"><span className={`rank-fill ${color}`} style={{width:`${metric.percent}%`}}/></div></div><span className="rank-count">{number(metric.count)}<small>вак.</small></span></button>)}{!metrics.length&&<div className="empty-state compact"><p>Для выбранного фильтра нет показателей.</p></div>}</div><button className="card-source" onClick={onAll}><Database size={13}/>Все данные<span className="nav-count">{metrics.length}</span></button></article>}
-function Progress({analysis:a,onCancel,loading}:{analysis:Analysis;onCancel:()=>void;loading:boolean}) {return <section className="progress-card"><div className="progress-intro"><h2>Анализ</h2><p aria-live="polite"><LoaderCircle size={15} className="spin"/>{a.message}</p></div><div className="progress-stats"><div><strong>{number(a.collected)}</strong><span>Ссылки</span></div><div><strong>{number(a.processed)}</strong><span>Загружено</span></div><div><strong>{a.found?number(a.found):'Нет данных'}</strong><span>Найдено</span></div></div><div className="progress-bottom"><button className="button secondary" disabled={loading} onClick={onCancel}>{loading?<LoaderCircle className="spin" size={14}/>:<Pause size={14}/>}Остановить</button></div></section>}
+function scopedMetrics(current:Metric[],available:Metric[]):Metric[] {
+  if(!available.length)return current;
+  const currentByLabel=new Map(current.map(metric=>[metric.label,metric]));
+  return available.map(metric=>currentByLabel.get(metric.label)||{...metric,count:0,percent:0,vacancyIds:[],evidence:[]});
+}
+
+function EmploymentFormatStats({report,availableMetrics,selected,onToggle}:{report:NonNullable<Analysis['report']>;availableMetrics?:Metric[];selected:string[];onToggle:(value:string)=>void}) {
+  const current=report.dimensions.employmentForm?.length?report.dimensions.employmentForm:report.dimensions.employment||[];
+  const metrics=scopedMetrics(current,availableMetrics||[]);
+  const available=new Map((availableMetrics||metrics).map(metric=>[metric.label,metric.count]));
+  if(!metrics.length)return null;
+  const labels=['ТК РФ','ИП','Самозанятость','ГПХ'];
+  const known=labels.map(label=>metrics.find(metric=>metric.label.toLowerCase()===label.toLowerCase())||{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]});
+  const extras=metrics.filter(metric=>!labels.some(label=>label.toLowerCase()===metric.label.toLowerCase()));
+  return <section className="employment-format-card" aria-labelledby="employment-format-heading"><div className="employment-format-heading"><div><h2 id="employment-format-heading">Формат оформления</h2><p>Как оформляют сотрудничество в найденных вакансиях</p></div><div className="employment-format-meta"><span className="chart-meta" title="Одна вакансия может предлагать несколько вариантов оформления">С пересечениями</span><span className="chart-meta">{number(report.total)} вакансий</span></div></div><div className="employment-format-grid">{[...known,...extras].map(metric=><button type="button" className={`employment-format-stat ${selected.includes(metric.label)?'selected':''}`} key={metric.key} disabled={!metric.count&&!available.get(metric.label)} aria-pressed={selected.includes(metric.label)} onClick={()=>onToggle(metric.label)}><div><strong>{metric.label}</strong><span>{number(metric.count)}</span></div><div className="employment-format-track"><span style={{width:`${Math.min(metric.percent,100)}%`}}/></div><small>{number(metric.percent)}%</small></button>)}</div></section>;
+}
+
+function Progress({analysis:a,onCancel,loading}:{analysis:Analysis;onCancel:()=>void;loading:boolean}) {
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!loading)onCancel()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[onCancel,loading]);
+  return <div className="progress-overlay" role="dialog" aria-modal="true" aria-labelledby="progress-title"><section className="progress-modal"><div className="progress-ring" aria-hidden="true"><LoaderCircle size={44} className="spin"/></div><h2 id="progress-title">Собираем данные</h2><p className="progress-operation" aria-live="polite">{a.message}</p><div className="progress-stats"><div><strong>{number(a.collected)}</strong><span>Ссылки</span></div><div><strong>{number(a.processed)}</strong><span>Загружено</span></div><div><strong>{a.skipped?number(a.skipped):'0'}</strong><span>Уже обработано</span></div><div><strong>{a.found?number(a.found):'Нет данных'}</strong><span>Найдено</span></div></div><button className="button secondary" disabled={loading} onClick={onCancel}>{loading?<LoaderCircle className="spin" size={14}/>:<Pause size={14}/>}Остановить</button></section></div>
+}

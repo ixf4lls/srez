@@ -17,6 +17,16 @@ func TestPrepareDoesNotAccessSource(t *testing.T) {
 		t.Fatalf("prepare: %d %s", w.Code, w.Body.String())
 	}
 }
+
+func TestPrepareIncludesExclusionsInHHExpression(t *testing.T) {
+	s := &Server{}
+	req := httptest.NewRequest("POST", "/api/prepare", strings.NewReader(`{"query":"Python","mode":"roles","excludeWords":"стажёр, гпх"}`))
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, req)
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `стажёр`) || !strings.Contains(w.Body.String(), `гпх`) {
+		t.Fatalf("prepare exclusions: %d %s", w.Code, w.Body.String())
+	}
+}
 func TestCreateRequiresExplicitConfirmation(t *testing.T) {
 	s := &Server{}
 	req := httptest.NewRequest("POST", "/api/analyses", strings.NewReader(`{"query":"Go","expression":"NAME:golang","mode":"roles","confirmed":false}`))

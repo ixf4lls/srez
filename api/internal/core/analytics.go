@@ -25,6 +25,8 @@ func NormalizeVacancy(v *Vacancy) {
 	if v.Format == "" {
 		v.Format = "Не указан"
 	}
+	forms := EmploymentForms(*v)
+	v.EmploymentForm = strings.Join(forms, " / ")
 	var grades []string
 	for _, g := range []struct{ p, l string }{{`junior|jun|джуниор|младший`, "Junior"}, {`middle|mid|мидл`, "Middle"}, {`senior|sr|сеньор|синьор`, "Senior"}, {`lead|тимлид|techlead`, "Lead"}} {
 		if Contains(v.Title, g.p) {
@@ -51,6 +53,38 @@ func NormalizeVacancy(v *Vacancy) {
 		v.Experience = "Не указан"
 	}
 	v.Requirements = ExtractRequirements(v.Description)
+}
+
+// EmploymentForms returns the legal engagement forms explicitly mentioned in a
+// vacancy. A missing mention is kept as a separate category so the report
+// denominator remains visible to the reader.
+func EmploymentForms(v Vacancy) []string {
+	text := strings.ToLower(strings.Join([]string{v.EmploymentForm, v.Employment, v.Description}, " "))
+	result := []string{}
+	add := func(label string) {
+		for _, existing := range result {
+			if existing == label {
+				return
+			}
+		}
+		result = append(result, label)
+	}
+	if regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])тк\s*рф(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:трудов\p{L}*\s+договор|официальн\p{L}*\s+оформ)`).MatchString(text) {
+		add("ТК РФ")
+	}
+	if regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])гпх(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:гражданск\p{L}*[- ]правов\p{L}*\s+договор|договор\p{L}*\s+подряда|оказани\p{L}*\s+услуг)`).MatchString(text) {
+		add("ГПХ")
+	}
+	if regexp.MustCompile(`(?i)самозанят\p{L}*`).MatchString(text) {
+		add("Самозанятость")
+	}
+	if regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])ип(?:$|[^\p{L}\p{N}_])|индивидуальн\p{L}* предпринимател\p{L}*`).MatchString(text) {
+		add("ИП")
+	}
+	if len(result) == 0 {
+		return []string{"Не указан"}
+	}
+	return result
 }
 
 type rule struct{ key, label, pattern string }
@@ -174,13 +208,16 @@ func WorkFormats(v Vacancy) []string {
 }
 
 func BuildReport(vacancies []Vacancy) *Report {
-	r := &Report{Dimensions: map[string][]Metric{}, Skills: []Metric{}, Requirements: []Metric{}, Responses: []ResponsePoint{}, Version: "rules-v4"}
+	r := &Report{Dimensions: map[string][]Metric{}, Skills: []Metric{}, Requirements: []Metric{}, Responses: []ResponsePoint{}, Version: "rules-v5"}
 	groups := map[string]map[string]*Metric{}
-	for _, dim := range []string{"city", "format", "experience", "grade"} {
+	for _, dim := range []string{"city", "format", "employmentForm", "experience", "grade"} {
 		groups[dim] = map[string]*Metric{}
 	}
 	for _, label := range []string{"Офис", "Удалённо", "Гибрид"} {
 		groups["format"][label] = &Metric{Key: label, Label: label, VacancyIDs: []string{}, Evidence: []Evidence{}}
+	}
+	for _, label := range []string{"ТК РФ", "ИП", "Самозанятость", "ГПХ", "Не указан"} {
+		groups["employmentForm"][label] = &Metric{Key: label, Label: label, VacancyIDs: []string{}, Evidence: []Evidence{}}
 	}
 	skills := map[string]*Metric{}
 	reqs := map[string]*Metric{}
@@ -209,6 +246,9 @@ func BuildReport(vacancies []Vacancy) *Report {
 		}
 		for _, label := range WorkFormats(v) {
 			add(groups["format"], label, label, "", v, "workFormats", label)
+		}
+		for _, label := range EmploymentForms(v) {
+			add(groups["employmentForm"], label, label, "", v, "employmentForm", label)
 		}
 		if len(v.KeySkills) > 0 {
 			r.SkillsCoverage++

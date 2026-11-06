@@ -133,9 +133,9 @@ type SearchResult struct {
 	HasMore                   *bool `json:"hasMore"`
 }
 type Detail struct {
-	Title, Company, Salary, Experience, Employment, WorkSchedule, WorkingHours, Address, City, Description, PublishedAt string
-	WorkFormats, KeySkills                                                                                              []string
-	ResponseCount                                                                                                       *int
+	Title, Company, Salary, Experience, Employment, EmploymentForm, WorkSchedule, WorkingHours, Address, City, Description, PublishedAt string
+	WorkFormats, KeySkills                                                                                                              []string
+	ResponseCount                                                                                                                       *int
 }
 
 func (j *Jobs) run(ctx context.Context, id string) {
@@ -162,6 +162,7 @@ func (j *Jobs) run(ctx context.Context, id string) {
 	for _, v := range existing {
 		seen[v.ID] = true
 	}
+	linkSeen := map[string]bool{}
 	pagesSeen := map[string]bool{}
 	for !a.SearchDone && a.NextPage < 40 {
 		if ctx.Err() != nil {
@@ -197,12 +198,28 @@ func (j *Jobs) run(ctx context.Context, id string) {
 		signature := strings.Join(pageIDs, ",")
 		repeated := pagesSeen[signature]
 		pagesSeen[signature] = true
+		known, err := j.Store.LoadedVacancyIDs(ctx, pageIDs)
+		if err != nil {
+			j.fail(ctx, &a, err)
+			return
+		}
 		for _, item := range page.Items {
 			match := regexp.MustCompile(`/vacancy/(\d+)`).FindStringSubmatch(item.URL)
-			if len(match) < 2 || seen[match[1]] {
+			if len(match) < 2 {
 				continue
 			}
 			vid := match[1]
+			if linkSeen[vid] {
+				continue
+			}
+			linkSeen[vid] = true
+			if seen[vid] {
+				continue
+			}
+			if known[vid] {
+				a.Skipped++
+				continue
+			}
 			seen[vid] = true
 			v := core.Vacancy{ID: vid, URL: "https://hh.ru/vacancy/" + vid, Title: item.Title, Company: item.Employer, Salary: item.Compensation, Address: item.Address, CollectedAt: time.Now().UTC(), KeySkills: []string{}, WorkFormats: []string{}, Requirements: []core.Requirement{}}
 			if err = j.Store.PutVacancy(ctx, id, v, false); err != nil {
@@ -238,7 +255,7 @@ func (j *Jobs) run(ctx context.Context, id string) {
 		a.SearchDone = true
 		a.Warnings = append(a.Warnings, "Достигнуто ограничение известной операции hh.ru: 40 страниц. Для полного охвата сузьте запрос или фильтры.")
 	}
-	if a.Found > a.Collected {
+	if a.Found > a.Collected+a.Skipped {
 		a.Warnings = append(a.Warnings, fmt.Sprintf("Выдача hh.ru: %d, собрано уникальных: %d. Статистика рассчитана по загруженным вакансиям.", a.Found, a.Collected))
 	}
 	a.Stage = "details"
@@ -295,6 +312,7 @@ func (j *Jobs) run(ctx context.Context, id string) {
 			v.Salary = detail.Salary
 			v.Experience = detail.Experience
 			v.Employment = detail.Employment
+			v.EmploymentForm = detail.EmploymentForm
 			v.WorkFormats = detail.WorkFormats
 			v.WorkSchedule = detail.WorkSchedule
 			v.WorkingHours = detail.WorkingHours
@@ -330,7 +348,10 @@ func (j *Jobs) run(ctx context.Context, id string) {
 	}
 	status := "completed"
 	message := "Анализ готов"
-	if a.Failed > 0 || a.Found > a.Collected || len(a.Warnings) > 0 {
+	if a.Collected == 0 && a.Skipped > 0 && a.Found <= a.Skipped {
+		message = "Все найденные вакансии уже разобраны в других анализах"
+	}
+	if a.Failed > 0 || a.Found > a.Collected+a.Skipped || len(a.Warnings) > 0 {
 		status = "partial"
 		message = "Анализ готов по доступным данным"
 	}

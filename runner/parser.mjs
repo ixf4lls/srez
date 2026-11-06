@@ -7,6 +7,18 @@ export function initialState(html) {
 }
 
 const clean = s => String(s ?? '').replace(/\\xa0/g, ' ').replace(/\s+/g, ' ').trim();
+
+export function employmentFormFromText(...parts) {
+  const text = parts.map(clean).join(' ').toLowerCase();
+  const labels = [];
+  const add = label => { if (!labels.includes(label)) labels.push(label); };
+  if (/(?:^|[^\p{L}\p{N}_])тк\s*рф(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:трудов\p{L}*\s+договор|официальн\p{L}*\s+оформ)/iu.test(text)) add('ТК РФ');
+  if (/(?:^|[^\p{L}\p{N}_])гпх(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:гражданск\p{L}*[- ]правов\p{L}*\s+договор|договор\p{L}*\s+подряда|оказани\p{L}*\s+услуг)/iu.test(text)) add('ГПХ');
+  if (/самозанят\p{L}*/iu.test(text)) add('Самозанятость');
+  if (/(?:^|[^\p{L}\p{N}_])ип(?:$|[^\p{L}\p{N}_])|индивидуальн\p{L}*\s+предпринимател\p{L}*/iu.test(text)) add('ИП');
+  return labels.join(' / ');
+}
+
 export function searchPage(html, extracted) {
   const state = initialState(html);
   const doc = parse(html);
@@ -66,6 +78,8 @@ export function detailFromHTML(html, value, countRecipe) {
   const found = new RegExp(countRecipe).exec(html);
   const responses = found ? Number(found[1]) : null;
   const city = vacancy.area?.name ?? vacancy.vacancy?.area?.name ?? '';
-  return { ...value, description: paragraphs.length ? paragraphs.join('\n\n') : value.description,
+  const description = paragraphs.length ? paragraphs.join('\n\n') : value.description;
+  return { ...value, description,
+    employmentForm: employmentFormFromText(value.employment, value.employmentForm, description),
     city, responseCount: Number.isFinite(responses) ? responses : null };
 }

@@ -54,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /api/health", s.health)
 	m.HandleFunc("GET /api/filters", s.getFilters)
+	m.HandleFunc("GET /api/rates", s.rates)
 	m.HandleFunc("POST /api/prepare", s.prepare)
 	m.HandleFunc("GET /api/analyses", s.list)
 	m.HandleFunc("POST /api/analyses", s.create)
@@ -63,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /api/analyses/{id}/vacancies", s.vacancies)
 	m.HandleFunc("POST /api/analyses/{id}/cancel", s.cancel)
 	m.HandleFunc("POST /api/analyses/{id}/resume", s.resume)
+	m.HandleFunc("POST /api/analyses/{id}/refresh", s.refresh)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if r.Method == "POST" {
@@ -100,13 +102,14 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) prepare(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Query string `json:"query"`
-		Mode  string `json:"mode"`
+		Query        string `json:"query"`
+		Mode         string `json:"mode"`
+		ExcludeWords string `json:"excludeWords"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
-	value, err := core.Optimize(input.Query, input.Mode)
+	value, err := core.OptimizeWithExclusions(input.Query, input.Mode, input.ExcludeWords)
 	if err != nil {
 		fail(w, 400, err.Error())
 		return
@@ -193,6 +196,8 @@ func (s *Server) restoreAnalyses(w http.ResponseWriter, r *http.Request) {
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Query        string       `json:"query"`
+		Title        string       `json:"title"`
+		ExcludeWords string       `json:"excludeWords"`
 		Expression   string       `json:"expression"`
 		Mode         string       `json:"mode"`
 		Filters      core.Filters `json:"filters"`
@@ -206,10 +211,19 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Сначала подтвердите поисковый запрос")
 		return
 	}
-	if _, err := core.Optimize(input.Query, input.Mode); err != nil {
+	if len(input.ExcludeWords) > 1600 {
+		fail(w, 400, "Исключения слишком длинные")
+		return
+	}
+	if _, err := core.OptimizeWithExclusions(input.Query, input.Mode, input.ExcludeWords); err != nil {
 		fail(w, 400, err.Error())
 		return
 	}
+	if err := core.ValidateExpression(input.Expression); err != nil {
+		fail(w, 400, err.Error())
+		return
+	}
+	input.Expression = core.ApplyExclusions(input.Expression, input.ExcludeWords)
 	if err := core.ValidateExpression(input.Expression); err != nil {
 		fail(w, 400, err.Error())
 		return
@@ -227,7 +241,15 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now().UTC()
-	a := core.Analysis{ID: hex.EncodeToString(b), Title: strings.TrimSpace(input.Query), Query: input.Query, Expression: input.Expression, Mode: input.Mode, Filters: input.Filters, Status: "queued", Stage: "queued", Message: "Ожидаем начала сбора", CreatedAt: now, UpdatedAt: now, Warnings: []string{}}
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		title = strings.TrimSpace(input.Query)
+	}
+	if len([]rune(title)) > 180 {
+		fail(w, 400, "Название поиска должно быть не длиннее 180 символов")
+		return
+	}
+	a := core.Analysis{ID: hex.EncodeToString(b), Title: title, Query: input.Query, ExcludeWords: input.ExcludeWords, Expression: input.Expression, Mode: input.Mode, Filters: input.Filters, Status: "queued", Stage: "queued", Message: "Ожидаем начала сбора", CreatedAt: now, UpdatedAt: now, Warnings: []string{}}
 	a.FilterLabels = input.FilterLabels
 	if a.Filters == nil {
 		a.Filters = core.Filters{}
@@ -303,6 +325,44 @@ func (s *Server) resume(w http.ResponseWriter, r *http.Request) {
 	s.Jobs.Start(id)
 	write(w, 200, a)
 }
+
+func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	a, err := s.Store.Get(r.Context(), id)
+	if err != nil {
+		fail(w, 404, "Анализ не найден")
+		return
+	}
+	if s.Jobs.Active(id) {
+		fail(w, 409, "Анализ уже выполняется")
+		return
+	}
+	count, err := s.Store.ResetVacancies(r.Context(), id)
+	if err != nil {
+		fail(w, 500, "Не удалось подготовить обновление вакансий")
+		return
+	}
+	a.Status = "queued"
+	a.Stage = "queued"
+	a.Message = "Ожидаем актуализации данных вакансий"
+	a.Error = ""
+	a.CompletedAt = nil
+	a.Report = nil
+	a.NextPage = 0
+	a.SearchDone = true
+	a.Found = count
+	a.Collected = count
+	a.Skipped = 0
+	a.Processed = 0
+	a.Failed = 0
+	a.Warnings = []string{}
+	if err = s.Store.Save(r.Context(), &a); err != nil {
+		fail(w, 500, "Не удалось сохранить обновление")
+		return
+	}
+	s.Jobs.Start(id)
+	write(w, 200, a)
+}
 func (s *Server) Recover(ctx context.Context) error {
 	rows, err := s.Store.List(ctx)
 	if err != nil {
@@ -323,7 +383,7 @@ func (s *Server) Recover(ctx context.Context) error {
 			if getErr != nil {
 				return getErr
 			}
-			if full.Report != nil && (full.Report.Version == "rules-v1" || full.Report.Version == "rules-v2" || full.Report.Version == "rules-v3") {
+			if full.Report != nil && (full.Report.Version == "rules-v1" || full.Report.Version == "rules-v2" || full.Report.Version == "rules-v3" || full.Report.Version == "rules-v4") {
 				vacancies, loadErr := s.Store.Vacancies(ctx, a.ID)
 				if loadErr != nil {
 					return loadErr

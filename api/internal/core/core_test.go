@@ -40,6 +40,40 @@ func TestOptimizationPreservesUserLogic(t *testing.T) {
 		t.Fatal("stack mode unexpectedly restricted title")
 	}
 }
+
+func TestOptimizationAppliesSafeExclusionsOnce(t *testing.T) {
+	p, err := OptimizeWithExclusions("Python", "roles", "стажёр, продажи")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.Expression, `NAME:"стажёр"`) || !strings.Contains(p.Expression, `DESCRIPTION:"продажи"`) {
+		t.Fatalf("missing exclusions: %s", p.Expression)
+	}
+	if got := ApplyExclusions(p.Expression, "стажёр, продажи"); got != p.Expression {
+		t.Fatalf("exclusions were duplicated: %s", got)
+	}
+}
+
+func TestOptimizationAddsSafeTitleAndDescriptionExclusions(t *testing.T) {
+	p, err := OptimizeWithExclusions("Python", "roles", "стажёр, руководитель проекта")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.Expression, `NOT (NAME:"стажёр" OR DESCRIPTION:"стажёр" OR NAME:"руководитель проекта" OR DESCRIPTION:"руководитель проекта")`) {
+		t.Fatalf("missing exclusion clause: %s", p.Expression)
+	}
+	p, err = OptimizeWithExclusions(`NAME:(python OR golang)`, "roles", "junior")
+	if err != nil || !strings.HasPrefix(p.Expression, `NAME:(python OR golang) AND NOT`) {
+		t.Fatalf("explicit expression was not preserved: %+v %v", p, err)
+	}
+}
+
+func TestOptimizationExpandsRoleSynonyms(t *testing.T) {
+	p, err := Optimize("full stack developer", "roles")
+	if err != nil || !strings.Contains(p.Expression, `"full stack"`) {
+		t.Fatalf("role synonyms were not expanded: %+v %v", p, err)
+	}
+}
 func TestRequirementsRespectSectionsAndNegation(t *testing.T) {
 	description := "Обязанности\n\nМиграция с Java на Go\n\nТребования\n\nОпыт работы с PostgreSQL и Docker\n\nОпыт Java не требуется\n\nБудет плюсом\n\nKubernetes\n\nУсловия\n\nЗанятия английским"
 	reqs := ExtractRequirements(description)
@@ -113,6 +147,25 @@ func TestWorkFormatsOverlapWithoutDuplicatingVacancies(t *testing.T) {
 	}
 	if r.Total != 3 {
 		t.Fatal("overlap changed the vacancy count")
+	}
+}
+
+func TestEmploymentFormDimensions(t *testing.T) {
+	vs := []Vacancy{
+		{ID: "1", Loaded: true, Employment: "Оформление по ТК РФ"},
+		{ID: "2", Loaded: true, Description: "Возможна работа по договору ГПХ или как самозанятый"},
+		{ID: "3", Loaded: true, Description: "Условия обсуждаются"},
+	}
+	for i := range vs {
+		NormalizeVacancy(&vs[i])
+	}
+	r := BuildReport(vs)
+	got := map[string]Metric{}
+	for _, m := range r.Dimensions["employmentForm"] {
+		got[m.Label] = m
+	}
+	if got["ТК РФ"].Count != 1 || got["ГПХ"].Count != 1 || got["Самозанятость"].Count != 1 || got["Не указан"].Count != 1 {
+		t.Fatalf("incorrect employment form stats: %+v", got)
 	}
 }
 func TestValidateExpression(t *testing.T) {

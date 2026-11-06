@@ -27,7 +27,8 @@ func NewStore(ctx context.Context, url string) (*Store, error) {
 	 analysis_id text NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
 	 id text NOT NULL, document jsonb NOT NULL, PRIMARY KEY(analysis_id,id)
 	); ALTER TABLE analyses ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
-	CREATE INDEX IF NOT EXISTS analyses_created ON analyses(created_at DESC);`)
+	CREATE INDEX IF NOT EXISTS analyses_created ON analyses(created_at DESC);
+	CREATE INDEX IF NOT EXISTS vacancies_loaded_id ON vacancies(id) WHERE (document->>'loaded')='true';`)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -106,6 +107,40 @@ func (s *Store) Vacancies(ctx context.Context, id string) ([]core.Vacancy, error
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+// LoadedVacancyIDs returns snapshots that already contain a parsed detail
+// response. The lookup is intentionally global, so a new analysis can reuse
+// the existing snapshot by skipping that vacancy at link collection time.
+func (s *Store) LoadedVacancyIDs(ctx context.Context, ids []string) (map[string]bool, error) {
+	known := map[string]bool{}
+	if len(ids) == 0 {
+		return known, nil
+	}
+	rows, err := s.DB.Query(ctx, `SELECT id FROM vacancies WHERE id=ANY($1::text[]) AND document->>'loaded'='true'`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		known[id] = true
+	}
+	return known, rows.Err()
+}
+
+// ResetVacancies keeps the collected link list but marks every detail as
+// stale. The refresh job then fetches each vacancy again without redoing the
+// search pages.
+func (s *Store) ResetVacancies(ctx context.Context, id string) (int, error) {
+	result, err := s.DB.Exec(ctx, `UPDATE vacancies SET document=(document - 'error') || '{"loaded":false}'::jsonb WHERE analysis_id=$1`, id)
+	if err != nil {
+		return 0, err
+	}
+	return int(result.RowsAffected()), nil
 }
 func IsMissing(err error) bool { return errors.Is(err, pgx.ErrNoRows) }
 

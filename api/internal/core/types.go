@@ -8,6 +8,7 @@ type Analysis struct {
 	ID           string     `json:"id"`
 	Title        string     `json:"title"`
 	Query        string     `json:"query"`
+	ExcludeWords string     `json:"excludeWords,omitempty"`
 	Expression   string     `json:"expression"`
 	Mode         string     `json:"mode"`
 	Filters      Filters    `json:"filters"`
@@ -20,6 +21,7 @@ type Analysis struct {
 	CompletedAt  *time.Time `json:"completedAt,omitempty"`
 	Found        int        `json:"found"`
 	Collected    int        `json:"collected"`
+	Skipped      int        `json:"skipped"`
 	Processed    int        `json:"processed"`
 	Failed       int        `json:"failed"`
 	NextPage     int        `json:"nextPage"`
@@ -30,28 +32,29 @@ type Analysis struct {
 }
 
 type Vacancy struct {
-	ID            string        `json:"id"`
-	URL           string        `json:"url"`
-	Title         string        `json:"title"`
-	Company       string        `json:"company"`
-	Salary        string        `json:"salary"`
-	City          string        `json:"city"`
-	Address       string        `json:"address"`
-	Experience    string        `json:"experience"`
-	WorkFormats   []string      `json:"workFormats"`
-	Format        string        `json:"format"`
-	Grade         string        `json:"grade"`
-	Employment    string        `json:"employment"`
-	WorkSchedule  string        `json:"workSchedule"`
-	WorkingHours  string        `json:"workingHours"`
-	Description   string        `json:"description"`
-	KeySkills     []string      `json:"keySkills"`
-	ResponseCount *int          `json:"responseCount"`
-	PublishedAt   string        `json:"publishedAt"`
-	CollectedAt   time.Time     `json:"collectedAt"`
-	Loaded        bool          `json:"loaded"`
-	Error         string        `json:"error,omitempty"`
-	Requirements  []Requirement `json:"requirements"`
+	ID             string        `json:"id"`
+	URL            string        `json:"url"`
+	Title          string        `json:"title"`
+	Company        string        `json:"company"`
+	Salary         string        `json:"salary"`
+	City           string        `json:"city"`
+	Address        string        `json:"address"`
+	Experience     string        `json:"experience"`
+	WorkFormats    []string      `json:"workFormats"`
+	Format         string        `json:"format"`
+	EmploymentForm string        `json:"employmentForm"`
+	Grade          string        `json:"grade"`
+	Employment     string        `json:"employment"`
+	WorkSchedule   string        `json:"workSchedule"`
+	WorkingHours   string        `json:"workingHours"`
+	Description    string        `json:"description"`
+	KeySkills      []string      `json:"keySkills"`
+	ResponseCount  *int          `json:"responseCount"`
+	PublishedAt    string        `json:"publishedAt"`
+	CollectedAt    time.Time     `json:"collectedAt"`
+	Loaded         bool          `json:"loaded"`
+	Error          string        `json:"error,omitempty"`
+	Requirements   []Requirement `json:"requirements"`
 }
 
 type Requirement struct {

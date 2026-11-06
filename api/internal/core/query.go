@@ -81,7 +81,17 @@ type Proposal struct {
 	Technologies []string `json:"technologies"`
 }
 
+// Optimize keeps the original public API for callers that do not need
+// exclusions. Use OptimizeWithExclusions for the search form.
 func Optimize(query, mode string) (Proposal, error) {
+	return OptimizeWithExclusions(query, mode, "")
+}
+
+// OptimizeWithExclusions turns a plain-language request into hh.ru query
+// syntax and appends title/description exclusions as one safe NOT clause.
+// Exclusions are quoted as phrases, so operators typed into the separate field
+// cannot change the rest of the expression.
+func OptimizeWithExclusions(query, mode, excludeWords string) (Proposal, error) {
 	query = strings.TrimSpace(query)
 	if query == "" || len(query) > 1500 {
 		return Proposal{}, errors.New("Введите запрос длиной от 1 до 1500 символов")
@@ -89,8 +99,9 @@ func Optimize(query, mode string) (Proposal, error) {
 	if mode != "roles" && mode != "stack" {
 		return Proposal{}, errors.New("Неизвестный режим релевантности")
 	}
-	if regexp.MustCompile(`(?i)(\b(?:NAME|DESCRIPTION|COMPANY_NAME):|\b(?:AND|OR|NOT)\b)`).MatchString(query) {
-		return Proposal{query, []string{"Обнаружен язык запросов hh.ru. Ваше выражение сохранено без изменений."}, []string{}}, nil
+	if isHHExpression(query) {
+		p := Proposal{query, []string{"Обнаружен язык запросов hh.ru. Ваше выражение сохранено без изменений."}, []string{}}
+		return appendExclusions(p, excludeWords), nil
 	}
 	var found []Technology
 	for _, t := range Technologies {
@@ -125,20 +136,14 @@ func Optimize(query, mode string) (Proposal, error) {
 	remaining = regexp.MustCompile(`(?i)(?:\bdeveloper\b|\bengineer\b|разработчик[а-я]*|программист[а-я]*|\band\b|\bи\b)`).ReplaceAllString(remaining, " ")
 	remaining = strings.Trim(remaining, " ,;/+-\t\n")
 	if len(found) == 0 {
-		a := query
-		if Contains(query, `backend|бэкенд|бекенд`) {
-			a = `backend OR бэкенд OR бекенд`
-		}
-		if Contains(query, `frontend|фронтенд|фронтэнд`) {
-			a = `frontend OR фронтенд OR фронтэнд`
-		}
+		a := expandRoleTerms(query)
 		if mode == "roles" {
 			terms = append(terms, "NAME:("+a+")")
 		} else {
 			terms = append(terms, "("+a+")")
 		}
 	} else if remaining != "" {
-		terms = append(terms, "("+remaining+")")
+		terms = append(terms, "("+expandRoleTerms(remaining)+")")
 	}
 	explanations := []string{fmt.Sprintf("Распознано технологий: %d. Варианты написания объединены через OR; разные технологии: через AND.", len(found))}
 	if mode == "roles" {
@@ -147,7 +152,91 @@ func Optimize(query, mode string) (Proposal, error) {
 		explanations = append(explanations, "Поиск по всем полям вакансии: разработка, аналитика, QA, ML и другие специальности.")
 	}
 	explanations = append(explanations, "Поиск начнётся только после подтверждения. Можно изменить любое условие.")
-	return Proposal{strings.Join(terms, " AND "), explanations, names}, nil
+	return appendExclusions(Proposal{strings.Join(terms, " AND "), explanations, names}, excludeWords), nil
+}
+
+func isHHExpression(query string) bool {
+	if regexp.MustCompile(`(?i)\b(?:NAME|DESCRIPTION|COMPANY_NAME|AREA|PROFESSIONAL_ROLE|EMPLOYMENT_FORM|WORK_FORMAT):`).MatchString(query) {
+		return true
+	}
+	// Uppercase boolean operators are the notation documented by hh.ru. A
+	// lowercase "and" in a natural-language request remains optimizable.
+	return regexp.MustCompile(`\b(?:AND|OR|NOT)\b`).MatchString(query) && (strings.ContainsAny(query, "()\"") || strings.Contains(query, ":"))
+}
+
+func parseExcludeWords(raw string) []string {
+	parts := strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == ';' || r == '\n' || r == '\r' })
+	seen := map[string]bool{}
+	out := []string{}
+	for _, part := range parts {
+		word := strings.Join(strings.Fields(strings.Trim(part, " \t\"")), " ")
+		if word == "" {
+			continue
+		}
+		if len([]rune(word)) > 80 {
+			word = string([]rune(word)[:80])
+		}
+		key := strings.ToLower(word)
+		if !seen[key] {
+			seen[key] = true
+			out = append(out, word)
+		}
+		if len(out) == 20 {
+			break
+		}
+	}
+	return out
+}
+
+func appendExclusions(p Proposal, raw string) Proposal {
+	words := parseExcludeWords(raw)
+	if len(words) == 0 {
+		return p
+	}
+	terms := make([]string, 0, len(words)*2)
+	for _, word := range words {
+		quoted := `"` + strings.ReplaceAll(word, `"`, "") + `"`
+		terms = append(terms, "NAME:"+quoted, "DESCRIPTION:"+quoted)
+	}
+	clause := "NOT (" + strings.Join(terms, " OR ") + ")"
+	if !strings.Contains(p.Expression, clause) {
+		if p.Expression != "" {
+			p.Expression += " AND "
+		}
+		p.Expression += clause
+	}
+	p.Explanations = append(p.Explanations, "Исключения применены к названию и описанию вакансии через NOT.")
+	return p
+}
+
+// ApplyExclusions adds the same normalized NOT clause used by Optimize. It is
+// used at the API boundary so a manually edited expression cannot accidentally
+// drop the separate exclusion field.
+func ApplyExclusions(expression, raw string) string {
+	p := appendExclusions(Proposal{Expression: strings.TrimSpace(expression)}, raw)
+	return p.Expression
+}
+
+func expandRoleTerms(query string) string {
+	cleaned := strings.Join(strings.Fields(query), " ")
+	lower := strings.ToLower(cleaned)
+	roles := []struct {
+		pattern   string
+		expansion string
+	}{
+		{`backend|бэкенд|бекенд`, `backend OR бэкенд OR бекенд`},
+		{`frontend|фронтенд|фронтэнд`, `frontend OR фронтенд OR фронтэнд`},
+		{`full.?stack|фулл.?стек`, `fullstack OR "full stack" OR фуллстек OR "фулл стек"`},
+		{`devops|девопс`, `devops OR девопс`},
+		{`qa|тестировщик|тестирование`, `QA OR тестировщик OR тестирование`},
+		{`data scientist|дата.?сайентист`, `"data scientist" OR "дата сайентист"`},
+	}
+	for _, role := range roles {
+		if regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(?:` + role.pattern + `)(?:$|[^\p{L}\p{N}_])`).MatchString(lower) {
+			return role.expansion
+		}
+	}
+	return quote(cleaned)
 }
 
 func technologyIndex(text string, t Technology) int {

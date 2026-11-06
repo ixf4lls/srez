@@ -3,6 +3,7 @@ import type {Metric,Report,Vacancy} from './types.ts';
 export const dimensions = [
   {key:'city', title:'География'},
   {key:'format', title:'Формат работы'},
+  {key:'employmentForm', title:'Формат оформления'},
   {key:'experience', title:'Опыт работы'},
   {key:'grade', title:'Грейд'},
 ] as const;
@@ -19,11 +20,23 @@ export function workFormats(v:Vacancy):string[] {
   })[label]);
 }
 
+export function employmentForms(v:Vacancy):string[] {
+  const text=[v.employmentForm||'',v.employment||'',v.description||''].join(' ').toLowerCase();
+  const result:string[]=[];
+  const add=(label:string)=>{if(!result.includes(label))result.push(label)};
+  if(/(?:^|[^\p{L}\p{N}_])тк\s*рф(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:трудов\p{L}*\s+договор|официальн\p{L}*\s+оформ)/u.test(text))add('ТК РФ');
+  if(/(?:^|[^\p{L}\p{N}_])гпх(?:$|[^\p{L}\p{N}_])|(?:^|[^\p{L}])(?:гражданск\p{L}*[- ]правов\p{L}*\s+договор|договор\p{L}*\s+подряда|оказани\p{L}*\s+услуг)/u.test(text))add('ГПХ');
+  if(/самозанят\p{L}*/u.test(text))add('Самозанятость');
+  if(/(?:^|[^\p{L}\p{N}_])ип(?:$|[^\p{L}\p{N}_])|индивидуальн\p{L}*\s+предпринимател\p{L}*/u.test(text))add('ИП');
+  return result.length?result:['Не указан'];
+}
+
 export function matches(v:Vacancy, filters:ViewFilters):boolean {
   return dimensions.every(({key})=>{
     const selected=filters[key];
     if(!selected?.length)return true;
     if(key==='format')return selected.some(value=>workFormats(v).includes(value));
+    if(key==='employmentForm')return selected.some(value=>employmentForms(v).includes(value));
     return selected.includes(v[key]||'Не указан');
   });
 }
@@ -37,7 +50,7 @@ function group(vacancies:Vacancy[],key:Dimension):Metric[] {
   const groups=new Map<string,Metric>();
   if(key==='format')for(const label of formats)groups.set(label,{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]});
   for(const v of vacancies){
-    const values=key==='format'?workFormats(v):[v[key]||'Не указан'];
+    const values=key==='format'?workFormats(v):key==='employmentForm'?employmentForms(v):[v[key]||'Не указан'];
     for(const label of values){
       const m=groups.get(label)??{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]};
       m.count++;m.vacancyIds.push(v.id);
@@ -69,14 +82,67 @@ export function deriveReport(base:Report, vacancies:Vacancy[]):Report {
 }
 
 export type Salary = {from:number|null;to:number|null;currency:string;period:string;tax:string;raw:string};
-export type SalaryPoint = Salary & {id:string;title:string;range:[number,number]};
+export type SalaryPoint = Salary & {
+  id:string;
+  title:string;
+  range:[number,number];
+  normalizedRange:[number,number];
+  normalizedFrom:number;
+  normalizedTo:number;
+  normalizedSpan:number;
+  original:string;
+};
 export type SalaryGroup = {key:string;label:string;points:SalaryPoint[]};
+
+export type SalaryRates = Record<string,number>;
+
+// Used until the API returns a fresh rate table. Values are only a rendering fallback.
+export const fallbackSalaryRates:SalaryRates={RUB:1,USD:92,EUR:99,GBP:116,CNY:13,JPY:.62,CHF:105,CAD:67,AUD:60,HKD:12,SGD:69,NZD:55,INR:1.1,TRY:2.8,PLN:23,CZK:4.1,SEK:8.7,NOK:8.5,DKK:13.3,ILS:25,BRL:18,ZAR:5,THB:2.6,KRW:.065,VND:.0037,AED:25,AMD:.23,GEL:34,MDL:5.1,UAH:2.3,KZT:0.2,BYN:29,UZS:0.0074,KGS:1.05,AZN:54};
+
+const monthlyFactor=(period:string)=>period==='год'?1/12:period==='неделя'?52/12:period==='день'?22:period==='час'?176:1;
+
+export function netFromGross(monthly:number):number {
+  if(monthly<=0)return 0;
+  const annual=monthly*12;
+  const bands:[[number,number],...[number,number][]]=[[2_400_000,.13],[5_000_000,.15],[20_000_000,.18],[50_000_000,.20],[Infinity,.22]];
+  let tax=0,previous=0;
+  for(const [limit,rate] of bands){
+    const taxable=Math.max(0,Math.min(annual,limit)-previous);
+    tax+=taxable*rate; previous=limit;
+    if(annual<=limit)break;
+  }
+  return Math.max(0,(annual-tax)/12);
+}
+
+export const grossToNet=netFromGross;
+
+export function normalizeSalary(salary:Salary,rates:SalaryRates=fallbackSalaryRates):[number,number] {
+  const rate=rates[salary.currency]??1;
+  const factor=monthlyFactor(salary.period);
+  const convert=(value:number|null)=>{
+    if(value==null)return null;
+    const monthly=value*rate*factor;
+    return salary.tax==='до вычета налогов'?netFromGross(monthly):monthly;
+  };
+  const from=convert(salary.from)??0;
+  const to=convert(salary.to)??from;
+  return [Math.round(Math.min(from,to)),Math.round(Math.max(from,to))];
+}
 
 export function parseSalary(raw:string):Salary|null {
   if(!raw?.trim())return null;
   const text=raw.replace(/[\u00a0\u202f]/g,' ').trim();
-  const currencyRules:[RegExp,string][]=[[/₽|руб|\bRUB\b|\bRUR\b/i,'RUB'],[/\$|\bUSD\b/i,'USD'],[/€|\bEUR\b/i,'EUR'],[/₸|\bKZT\b|тенге/i,'KZT'],[/\bBYN\b|\bBr\b/i,'BYN'],[/\bUZS\b|сум/i,'UZS'],[/\bKGS\b|сом/i,'KGS'],[/₼|\bAZN\b/i,'AZN']];
-  const currencyRule=currencyRules.find(([re])=>re.test(text));
+  const currencyRules:[RegExp,string][]=[
+    [/₽|руб|\bRUB\b|\bRUR\b/i,'RUB'],[/\$|\bUSD\b/i,'USD'],[/€|\bEUR\b/i,'EUR'],[/£|\bGBP\b/i,'GBP'],
+    [/¥|￥|\bCNY\b|юан/i,'CNY'],[/円|\bJPY\b|иен/i,'JPY'],[/₣|\bCHF\b|франк/i,'CHF'],[/\bCAD\b|канадск/i,'CAD'],[/\bAUD\b|австрал/i,'AUD'],[/\bHKD\b|гонконгск/i,'HKD'],[/\bSGD\b|сингапурск/i,'SGD'],[/\bNZD\b|новозеландск/i,'NZD'],
+    [/₹|\bINR\b|рупи/i,'INR'],[/₺|\bTRY\b|лир/i,'TRY'],[/zł|\bPLN\b|злот/i,'PLN'],[/\bCZK\b|чешск/i,'CZK'],[/\bSEK\b|шведск/i,'SEK'],[/\bNOK\b|норвежск/i,'NOK'],[/\bDKK\b|датск/i,'DKK'],[/₪|\bILS\b|шекел/i,'ILS'],[/R\$|\bBRL\b|бразильск/i,'BRL'],[/\bZAR\b|южноафриканск/i,'ZAR'],[/฿|\bTHB\b|бат/i,'THB'],[/₩|\bKRW\b|вон/i,'KRW'],[/₫|\bVND\b|донг/i,'VND'],[/د.?إ|\bAED\b|дирхам/i,'AED'],[/֏|\bAMD\b|драм/i,'AMD'],[/₾|\bGEL\b|лари/i,'GEL'],[/\bMDL\b|ле[йи]/i,'MDL'],[/₴|\bUAH\b|гривн/i,'UAH'],
+    [/₸|\bKZT\b|тенге/i,'KZT'],[/\bBYN\b|\bBr\b/i,'BYN'],[/\bUZS\b|сум/i,'UZS'],[/\bKGS\b|сом/i,'KGS'],[/₼|\bAZN\b/i,'AZN'],
+  ];
+  let currencyRule=currencyRules.find(([re])=>re.test(text));
+  if(!currencyRule){
+    const code=text.match(/\b[A-Z]{3}\b/i)?.[0];
+    if(code)currencyRule=[new RegExp(`\\b${code}\\b`,'i'),code.toUpperCase()];
+  }
   if(!currencyRule)return null;
   const currencyIndex=text.search(currencyRule[0]);
   const salaryText=text.slice(0,currencyIndex);
@@ -95,20 +161,20 @@ export function parseSalary(raw:string):Salary|null {
   return {from,to,currency:currencyRule[1],period,tax,raw};
 }
 
-export function salaryGroups(vacancies:Vacancy[]):SalaryGroup[] {
-  const groups=new Map<string,SalaryGroup>();
+export function salaryGroups(vacancies:Vacancy[],rates:SalaryRates=fallbackSalaryRates):SalaryGroup[] {
+  const group:SalaryGroup={key:'normalized-rub-monthly',label:'₽ · в месяц · на руки (нормализовано)',points:[]};
   for(const v of vacancies){
     if(!v.loaded)continue;
     const salary=parseSalary(v.salary);if(!salary)continue;
-    const key=[salary.currency,salary.period,salary.tax].join('|');
-    const symbol:Record<string,string>={RUB:'₽',USD:'$',EUR:'€',KZT:'₸'};
-    const label=`${symbol[salary.currency]||salary.currency} · ${salary.period} · ${salary.tax}`;
-    const group=groups.get(key)??{key,label,points:[]};
     const from=salary.from,to=salary.to;
     const range:[number,number]=from!=null&&to!=null&&from!==to?[from,to]:[0,to??from??0];
-    group.points.push({...salary,id:v.id,title:v.title,range});groups.set(key,group);
+    const normalized=normalizeSalary(salary,rates);
+    const normalizedFrom=from!=null&&to==null?normalized[0]:from!=null&&to!=null&&from!==to?normalized[0]:0;
+    const normalizedTo=normalized[1];
+    const normalizedSpan=Math.max(normalizedTo-normalizedFrom,from!=null&&to==null?Math.round(Math.max(normalizedFrom,1)*.01):1);
+    group.points.push({...salary,id:v.id,title:v.title,range,normalizedRange:[normalizedFrom,normalizedTo],normalizedFrom,normalizedTo,normalizedSpan,original:salary.raw});
   }
-  return [...groups.values()].sort((a,b)=>b.points.length-a.points.length||a.label.localeCompare(b.label,'ru'));
+  return group.points.length?[group]:[];
 }
 
 export function readViewFilters():ViewFilters {

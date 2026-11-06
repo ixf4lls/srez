@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deriveReport,filterVacancies,parseSalary,salaryGroups,workFormats} from './analytics.ts';
+import {deriveReport,employmentForms,filterVacancies,grossToNet,netFromGross,parseSalary,salaryGroups,workFormats} from './analytics.ts';
 import type {Report,Vacancy} from './types.ts';
 
 const vacancy=(id:string,values:Partial<Vacancy>={}):Vacancy=>({id,url:`https://hh.ru/vacancy/${id}`,title:`Job ${id}`,company:'Example',salary:'',city:'Москва',address:'Москва',experience:'1–3 года',workFormats:['на месте работодателя, удалённо или гибрид'],format:'Офис / Гибрид / Удалённо',grade:'Middle',employment:'',workSchedule:'',workingHours:'',description:'',keySkills:[],responseCount:null,publishedAt:'',collectedAt:'2026-11-01T09:00:00Z',loaded:true,requirements:[],...values});
@@ -25,6 +25,12 @@ test('whole-report filtering recomputes percentages, source IDs and the response
  assert.equal(r.dimensions.city[0].percent,100);assert.equal(r.responses[0].id,'1');
  assert.equal(deriveReport(base,[]).responseMean,null);
 });
+test('employment forms are grouped and can be combined within one filter category',()=>{
+ const vs=[vacancy('1',{employment:'Оформление по ТК РФ'}),vacancy('2',{description:'Можно работать как самозанятый или по ГПХ'}),vacancy('3')];
+ const r=deriveReport(base,vs);const forms=Object.fromEntries(r.dimensions.employmentForm.map(m=>[m.label,m]));
+ assert.deepEqual(employmentForms(vs[1]),['ГПХ','Самозанятость']);assert.equal(forms['ТК РФ'].count,1);assert.equal(forms['ГПХ'].count,1);assert.equal(forms['Самозанятость'].count,1);
+ assert.deepEqual(filterVacancies(vs,{employmentForm:['ТК РФ','ГПХ']}).map(v=>v.id),['1','2']);
+});
 test('salary ranges and one-sided bounds retain original units and tax treatment',()=>{
  assert.deepEqual(parseSalary('от 230 000 до 366 000 ₽ за месяц, на руки'),{from:230000,to:366000,currency:'RUB',period:'месяц',tax:'на руки',raw:'от 230 000 до 366 000 ₽ за месяц, на руки'});
  assert.equal(parseSalary('до 5 000 $ за месяц, до вычета налогов')?.from,null);
@@ -35,8 +41,10 @@ test('salary ranges and one-sided bounds retain original units and tax treatment
  assert.equal(parseSalary(''),null);assert.equal(parseSalary('Доход не указан'),null);
  assert.equal(parseSalary('от 300 000 до 200 000 ₽ за месяц'),null);
 });
-test('salary groups do not mix currencies, periods or net and gross',()=>{
- const groups=salaryGroups([vacancy('1',{salary:'от 300 000 ₽ за месяц, до вычета налогов'}),vacancy('2',{salary:'от 230 000 до 366 000 ₽ за месяц, на руки'}),vacancy('3',{salary:'до 5 000 $ за месяц, на руки'}),vacancy('4',{salary:'1 500 ₽ за час, на руки'}),vacancy('5')]);
- assert.equal(groups.length,4);assert.equal(groups.reduce((s,g)=>s+g.points.length,0),4);
- assert.deepEqual(groups.flatMap(g=>g.points).find(p=>p.id==='2')?.range,[230000,366000]);
+test('salary chart uses one normalized RUB scale and preserves original salary text',()=>{
+ const groups=salaryGroups([vacancy('1',{salary:'от 300 000 ₽ за месяц, до вычета налогов'}),vacancy('2',{salary:'от 230 000 до 366 000 ₽ за месяц, на руки'}),vacancy('3',{salary:'до 5 000 $ за месяц, на руки'}),vacancy('4',{salary:'1 500 ₽ за час, на руки'}),vacancy('5')],{RUB:1,USD:100});
+ assert.equal(groups.length,1);assert.equal(groups[0].points.length,4);
+ assert.deepEqual(groups[0].points.find(p=>p.id==='2')?.normalizedRange,[230000,366000]);
+ assert.equal(groups[0].points.find(p=>p.id==='3')?.original,'до 5 000 $ за месяц, на руки');
+ assert.equal(netFromGross(300000),259000);assert.equal(grossToNet(300000),259000);
 });
