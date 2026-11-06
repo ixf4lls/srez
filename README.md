@@ -1,6 +1,6 @@
 # Срез — анализ рынка вакансий hh.ru
 
-Локальное SPA: React 19, TypeScript, Tailwind CSS 4, Go, PostgreSQL 17. Оформление следует принципам [ButterUI](https://www.butterui.com/docs/introduction): плавные взаимодействия, спокойная анимация, белый и чёрный с акцентными цветами. Компоненты адаптированы для React; Astro не используется. LLM и платные API не нужны.
+Локальное SPA: React 19, TypeScript, Tailwind CSS 4, Go, PostgreSQL 17. Интерфейс следует [Figma UI kit](https://www.figma.com/design/qEnvppqqUuqQSFLRnLke3I): Gotham, светлая основа, фиолетовый и мятный акценты, иконки Iconsax Broken. Шрифтовые файлы предоставлены владельцем проекта. LLM и платные API не нужны.
 
 ## Запуск
 

@@ -1,3 +1,5 @@
+import {displayAppMessage} from './copy';
+
 export type Filters = Record<string,string>;
 export type FilterGroup = { key:string;label:string;options:{value:string;label:string;count:number}[] };
 export type Evidence = {vacancyId:string;field:string;quote:string};
@@ -9,14 +11,14 @@ export type Report = {total:number;dimensions:Record<string,Metric[]>;skills:Met
 export type Analysis = {id:string;title:string;query:string;excludeWords?:string;expression:string;mode:'roles'|'stack';filters:Filters;filterLabels?:Filters;status:string;stage:string;message:string;createdAt:string;updatedAt:string;completedAt?:string;found:number;collected:number;skipped?:number;processed:number;failed:number;nextPage:number;warnings:string[];error?:string;report?:Report};
 export type Proposal = {expression:string;explanations:string[];technologies:string[]};
 export const isActive = (a:Analysis) => ['queued','running'].includes(a.status);
-export const number = (n:number) => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(n);
-export const date = (s:string) => new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Moscow'}).format(new Date(s));
-export const statusLabel:Record<string,string> = {completed:'Готов',partial:'Частичные данные',running:'Выполняется',queued:'В очереди',attention:'Нужно внимание',cancelled:'Остановлен',interrupted:'Прерван'};
+export const number = (n:number) => new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
+export const date = (s:string) => new Intl.DateTimeFormat('en-US',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Moscow'}).format(new Date(s));
+export const statusLabel:Record<string,string> = {completed:'Complete',partial:'Partial data',running:'Running',queued:'Queued',attention:'Needs attention',cancelled:'Stopped',interrupted:'Interrupted'};
 export async function api<T>(path:string,body?:unknown):Promise<T> {
   const res=await fetch(`/api${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const text=await res.text();
   let json:{error?:string;reason?:string};
-  try{json=JSON.parse(text)}catch{throw new Error('Сервис анализа недоступен')}
-  if(!res.ok)throw new Error([json.error,json.reason].filter(Boolean).join('. ')||'Ошибка запроса');
+  try{json=JSON.parse(text)}catch{throw new Error('The analysis service is unavailable.')}
+  if(!res.ok)throw new Error([json.error,json.reason].filter(Boolean).map(part=>displayAppMessage(part!)).join(' ')||'The request failed.');
   return json as T;
 }

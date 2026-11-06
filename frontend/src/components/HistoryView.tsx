@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {AlertCircle,ArrowRight,LoaderCircle,Plus,Search,Trash2,Undo2,X} from 'lucide-react';
+import {AlertCircle,ArrowRight,LoaderCircle,Plus,Search,Trash2,Undo2,X} from '../kitIcons';
 import {api,date,isActive,number,statusLabel} from '../types';
 import type {Analysis} from '../types';
 
@@ -29,18 +29,18 @@ export function HistoryView({analyses,loading,error,navigate,refresh,onNew}:{ana
     catch(e){setActionError((e as Error).message)}finally{setBusy(false)}
   }
   return <>
-    <div className="page-heading"><h1>История</h1><button className="button primary" onClick={onNew}><Plus size={17}/>Новый анализ</button></div>
-    {(error||actionError)&&<div className="notice error" role="alert"><AlertCircle size={17}/>{actionError||error}{error&&<button onClick={()=>void refresh()}>Повторить</button>}</div>}
+    <div className="page-heading"><h1>History</h1><button className="button primary" onClick={onNew}><Plus size={17}/>New analysis</button></div>
+    {(error||actionError)&&<div className="notice error" role="alert"><AlertCircle size={17}/>{actionError||error}{error&&<button onClick={()=>void refresh()}>Retry</button>}</div>}
     {analyses.length>0&&<div className="history-controls">
-      <label className="select-all"><input ref={allCheckbox} type="checkbox" aria-label="Выбрать все найденные анализы" checked={allSelected} disabled={busy||!filtered.length} onChange={()=>setSelected(allSelected?new Set():new Set(filtered.map(a=>a.id)))}/><span>{selected.size?`Выбрано: ${number(selected.size)}`:'Выбрать все'}</span></label>
-      {selected.size>0&&<button className="button danger subtle" disabled={busy} onClick={()=>void remove([...selected])}><Trash2 size={15}/>Удалить ({number(selected.size)})</button>}
-      <label className="small-search"><Search size={16}/><input aria-label="Найти анализ" placeholder="Поиск" value={query} onChange={e=>{setQuery(e.target.value);setSelected(new Set())}}/></label>
+      <label className="select-all"><input ref={allCheckbox} type="checkbox" aria-label="Select all matching analyses" checked={allSelected} disabled={busy||!filtered.length} onChange={()=>setSelected(allSelected?new Set():new Set(filtered.map(a=>a.id)))}/><span>{selected.size?`Selected: ${number(selected.size)}`:'Select all'}</span></label>
+      {selected.size>0&&<button className="button danger subtle" disabled={busy} onClick={()=>void remove([...selected])}><Trash2 size={15}/>Delete ({number(selected.size)})</button>}
+      <label className="small-search"><Search size={16}/><input aria-label="Search analyses" placeholder="Search" value={query} onChange={e=>{setQuery(e.target.value);setSelected(new Set())}}/></label>
     </div>}
-    <div className="history-list">{loading?<div className="empty-state"><LoaderCircle className="spin"/>Загрузка…</div>:filtered.length?filtered.map(a=><article className={`history-item history-selectable ${selected.has(a.id)?'is-selected':''}`} key={a.id}>
-      <input type="checkbox" className="row-checkbox" aria-label={`Выбрать ${a.title}, ${date(a.createdAt)}`} checked={selected.has(a.id)} disabled={busy} onChange={()=>toggle(a.id)}/>
-      <button className="history-open" onClick={()=>navigate(`/analyses/${a.id}`)}><div className="history-main"><h3>{a.title}</h3><span>{date(a.createdAt)} · {a.mode==='roles'?'В названии':'Во всём тексте'}</span></div><div className="history-info"><strong>{number(a.processed)}</strong><span>вакансий</span></div><span className={`status-badge status-${a.status}`}>{isActive(a)&&<LoaderCircle size={12} className="spin"/>}{statusLabel[a.status]||a.status}</span></button>
-      <button className="icon-button delete-row" aria-label={`Удалить ${a.title}, ${date(a.createdAt)}`} title="Удалить" disabled={busy} onClick={()=>void remove([a.id])}><Trash2 size={16}/></button>
-    </article>):<div className="empty-state large"><h2>{query?'Ничего не найдено':'Нет анализов'}</h2>{!query&&<button className="button primary" onClick={onNew}>Новый анализ<ArrowRight size={16}/></button>}</div>}</div>
-    {undo.length>0&&<div className="undo-toast" role="status"><span>Удалено: {number(undo.length)}</span><button className="text-button" disabled={busy} onClick={()=>void restore()}><Undo2 size={14}/>Отменить</button><button className="icon-button" aria-label="Скрыть уведомление" onClick={()=>setUndo([])}><X size={15}/></button></div>}
+    <div className="history-list">{loading?<div className="empty-state"><LoaderCircle className="spin"/>Loading history…</div>:filtered.length?filtered.map(a=><article className={`history-item history-selectable ${selected.has(a.id)?'is-selected':''}`} key={a.id}>
+      <input type="checkbox" className="row-checkbox" aria-label={`Select ${a.title}, ${date(a.createdAt)}`} checked={selected.has(a.id)} disabled={busy} onChange={()=>toggle(a.id)}/>
+      <a className="history-open" href={`/analyses/${a.id}`} onClick={event=>{if(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();navigate(`/analyses/${a.id}`)}}><div className="history-main"><h2>{a.title}</h2><span>{date(a.createdAt)} · {a.mode==='roles'?'Job titles':'Full vacancy text'}</span></div><div className="history-info"><strong>{number(a.processed)}</strong><span>{a.processed===1?'vacancy':'vacancies'}</span></div><span className={`status-badge status-${a.status}`}>{isActive(a)&&<LoaderCircle size={12} className="spin"/>}{statusLabel[a.status]||a.status}</span></a>
+      <button className="icon-button delete-row" aria-label={`Delete ${a.title}, ${date(a.createdAt)}`} title="Delete" disabled={busy} onClick={()=>void remove([a.id])}><Trash2 size={16}/></button>
+    </article>):<div className="empty-state large"><h2>{query?'No matching analyses':'No analyses yet'}</h2><p>{query?'Try another search term or clear the search.':'Run a search to save your first market snapshot here.'}</p>{query?<button className="button secondary" onClick={()=>setQuery('')}>Clear search</button>:<button className="button primary" onClick={onNew}>New analysis<ArrowRight size={16}/></button>}</div>}</div>
+    {undo.length>0&&<div className="undo-toast" role="status"><span>Deleted: {number(undo.length)}</span><button className="text-button" disabled={busy} onClick={()=>void restore()}><Undo2 size={14}/>Undo</button><button className="icon-button" aria-label="Dismiss notification" onClick={()=>setUndo([])}><X size={15}/></button></div>}
   </>
 }

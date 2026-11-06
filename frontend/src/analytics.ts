@@ -1,11 +1,11 @@
 import type {Metric,Report,Vacancy} from './types.ts';
 
 export const dimensions = [
-  {key:'city', title:'География'},
-  {key:'format', title:'Формат работы'},
-  {key:'employmentForm', title:'Формат оформления'},
-  {key:'experience', title:'Опыт работы'},
-  {key:'grade', title:'Грейд'},
+  {key:'city', title:'Location'},
+  {key:'format', title:'Work format'},
+  {key:'employmentForm', title:'Engagement type'},
+  {key:'experience', title:'Experience'},
+  {key:'grade', title:'Seniority'},
 ] as const;
 export type Dimension = typeof dimensions[number]['key'];
 export type ViewFilters = Partial<Record<Dimension,string[]>>;
@@ -162,7 +162,7 @@ export function parseSalary(raw:string):Salary|null {
 }
 
 export function salaryGroups(vacancies:Vacancy[],rates:SalaryRates=fallbackSalaryRates):SalaryGroup[] {
-  const group:SalaryGroup={key:'normalized-rub-monthly',label:'₽ · в месяц · на руки (нормализовано)',points:[]};
+  const group:SalaryGroup={key:'normalized-rub-monthly',label:'RUB per month, net (normalized)',points:[]};
   for(const v of vacancies){
     if(!v.loaded)continue;
     const salary=parseSalary(v.salary);if(!salary)continue;
