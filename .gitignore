@@ -6,3 +6,9 @@ dist/
 .DS_Store
 coverage/
 api/server
+
+.idea/
+.vscode/
+*.tsbuildinfo
+*.swp
+*.swo
