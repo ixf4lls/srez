@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockApi } from './api.ts';
+import { deriveReport } from '../src/analytics.ts';
 import type { Analysis, FilterGroup, Vacancy } from '../src/types.ts';
 
 const initialTime = Date.parse('2026-11-09T10:00:00Z');
@@ -18,6 +19,7 @@ test('seed covers every status, relative dates, reports, evidence, categories an
   const report = analysis.report!;
   assert.equal(vacancies.length, analysis.collected);
   assert.equal(report.total, vacancies.filter(v => v.loaded).length);
+  assert.deepEqual(report, deriveReport(report, vacancies));
   assert.ok(report.dimensions.city.length > 5);
   assert.ok(report.dimensions.company.length > 5);
   assert.ok(vacancies.some(v => v.responseCount === null));

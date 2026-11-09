@@ -1,4 +1,3 @@
-import { deriveReport } from '../src/analytics.ts';
 import type { Analysis, FilterGroup, Metric, Report, Vacancy } from '../src/types.ts';
 
 const day = 86_400_000;
@@ -22,6 +21,7 @@ export function makeVacancies(snapshot: number, query = 'React', count = 48): Va
     const city = cities[index % cities.length];
     const workFormats = formats[index % formats.length];
     const grade = grades[index % grades.length];
+    const employmentForm = ['ТК РФ', 'ГПХ', 'Самозанятость', 'ИП'][index % 4];
     return {
       id: String(90000000 + index),
       url: `https://hh.ru/search/vacancy?text=${encodeURIComponent(query)}`,
@@ -29,9 +29,9 @@ export function makeVacancies(snapshot: number, query = 'React', count = 48): Va
       company: `Тестовая компания ${index % 9 + 1}`,
       salary: salaries[index % salaries.length], city, address: city,
       experience: experiences[index % experiences.length], workFormats, format: workFormats.join(' / '), grade,
-      employmentForm: ['ТК РФ', 'ГПХ', 'Самозанятость', 'ИП'][index % 4],
+      employmentForm,
       employment: 'Полная занятость', workSchedule: '5/2', workingHours: '8 часов',
-      description: `Тестовая вакансия для проверки интерфейса, не реальное предложение работы. Ссылка открывает поиск hh.ru.\n\nОбязательно: опыт разработки, ${skills.join(', ')}.\nБудет плюсом: настройка CI/CD, работа с Docker.\nОформление по ТК РФ или ГПХ. Команда работает в формате ${workFormats.join(' / ')}.`,
+      description: `Тестовая вакансия для проверки интерфейса, не реальное предложение работы. Ссылка открывает поиск hh.ru.\n\nОбязательно: опыт разработки, ${skills.join(', ')}.\nБудет плюсом: настройка CI/CD, работа с Docker.\nОформление: ${employmentForm}. Команда работает в формате ${workFormats.join(' / ')}.`,
       keySkills: [...new Set(skills)], responseCount: index % 11 === 0 ? null : index === 1 ? 0 : (index * 37 + 13) % 280,
       publishedAt: new Date(snapshot - (index % 38) * day).toISOString(),
       collectedAt: new Date(snapshot).toISOString(), loaded: index % 23 !== 22,
@@ -45,9 +45,10 @@ export function makeVacancies(snapshot: number, query = 'React', count = 48): Va
 }
 
 export function makeReport(vacancies: Vacancy[]): Report {
+  const loaded = vacancies.filter(v => v.loaded);
   const skills = new Map<string, Metric>();
   const requirements = new Map<string, Metric>();
-  for (const vacancy of vacancies.filter(v => v.loaded)) {
+  for (const vacancy of loaded) {
     for (const label of vacancy.keySkills) {
       const metric = skills.get(label) ?? { key: label, label, count: 0, percent: 0, vacancyIds: [], evidence: [] };
       metric.vacancyIds.push(vacancy.id);
@@ -62,11 +63,36 @@ export function makeReport(vacancies: Vacancy[]): Report {
       requirements.set(key, metric);
     }
   }
-  const base: Report = {
-    total: 0, dimensions: {}, skills: [...skills.values()], requirements: [...requirements.values()], responses: [],
-    responseMean: null, responseCoverage: 0, skillsCoverage: 0, requirementsCoverage: 0, version: 'mock-1',
+  const summarize = (metrics: Metric[]) => metrics.map(metric => ({
+    ...metric, count: metric.vacancyIds.length,
+    percent: loaded.length ? Math.round(metric.vacancyIds.length * 1000 / loaded.length) / 10 : 0,
+  }));
+  const sort = (metrics: Metric[]) => metrics.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'ru'));
+  const dimensions: Record<string, Metric[]> = {};
+  for (const key of ['city', 'format', 'employmentForm', 'experience', 'grade', 'company'] as const) {
+    const groups = new Map<string, Metric>();
+    if (key === 'format') for (const label of ['Офис', 'Удалённо', 'Гибрид']) {
+      groups.set(label, { key: label, label, count: 0, percent: 0, vacancyIds: [], evidence: [] });
+    }
+    for (const vacancy of loaded) {
+      const values = key === 'format' ? vacancy.workFormats : [vacancy[key] || 'Не указан'];
+      for (const label of values) {
+        const metric = groups.get(label) ?? { key: label, label, count: 0, percent: 0, vacancyIds: [], evidence: [] };
+        metric.vacancyIds.push(vacancy.id);
+        metric.evidence.push({ vacancyId: vacancy.id, field: key === 'format' ? 'workFormats' : key, quote: label });
+        groups.set(label, metric);
+      }
+    }
+    const metrics = summarize([...groups.values()]);
+    dimensions[key] = key === 'format' ? metrics : sort(metrics);
+  }
+  const responses = loaded.flatMap(v => v.responseCount === null ? [] : [{ id: v.id, title: v.title, count: v.responseCount }]);
+  return {
+    total: loaded.length, dimensions, skills: sort(summarize([...skills.values()])), requirements: sort(summarize([...requirements.values()])), responses,
+    responseMean: responses.length ? responses.reduce((sum, point) => sum + point.count, 0) / responses.length : null,
+    responseCoverage: responses.length, skillsCoverage: loaded.filter(v => v.keySkills.length).length,
+    requirementsCoverage: loaded.filter(v => v.requirements.length).length, version: 'mock-1',
   };
-  return deriveReport(base, vacancies);
 }
 
 export function makeEntry(id: string, snapshot: number, query: string, status = 'completed', count = 48): MockEntry {
