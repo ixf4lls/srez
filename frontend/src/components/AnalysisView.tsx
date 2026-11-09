@@ -1,3 +1,4 @@
+import { MarketIndexCard } from './MarketIndex';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Check, ChevronDown, Database, Expand, LoaderCircle, Pause, Play, RefreshCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,6 @@ import { ResponsePlot, SalaryPlot } from './VacancyCharts';
 import { VacancyBrowser } from './Vacancies';
 import { EmptyState, ErrorNotice, LoadingState, StatusBadge } from './AppUI';
 import { DeleteAnalysisDialog } from './DeleteAnalysisDialog';
-import { MarketIndexCard } from './MarketIndex';
 
 type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
 
