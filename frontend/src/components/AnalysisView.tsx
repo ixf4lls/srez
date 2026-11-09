@@ -165,8 +165,7 @@ function Breakdown({ title, dimension, metrics, selected, onToggle, onSources }:
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? metrics : metrics.slice(0, 5);
   return <section className="breakdown" data-testid={`dimension-${dimension}`}>
-    <div className="breakdown-heading"><h2>{title}</h2><IconButton variant="ghost" size="xs" aria-label={`Источники: ${title}`} onClick={onSources}><Database /></IconButton></div>
-    {dimension === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}
+    <div className="breakdown-heading"><div><h2>{title}</h2>{dimension === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}</div><IconButton variant="ghost" size="xs" aria-label={`Источники: ${title}`} onClick={onSources}><Database /></IconButton></div>
     <div className="breakdown-rows">{visible.map((m, i) => {
       const color = dimension === 'grade' && !onToggle ? gradeColor(m.label) : `var(--chart-${i % 5 + 1})`;
       const content = <><span className="breakdown-label">{selected.includes(m.label) && <Check size={12} aria-hidden="true" />}{m.label}</span><span className="breakdown-values"><span>{number(m.count)}</span><strong>{number(m.percent)}%</strong></span><span className="breakdown-track"><span style={{ width: `${m.percent}%`, background: color }} /></span></>;
