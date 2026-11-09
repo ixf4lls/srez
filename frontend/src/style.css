@@ -129,7 +129,7 @@
 .coverage-notice { padding: .875rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1rem; color: var(--muted-foreground); font-size: .75rem; }
 .coverage-notice summary { display: flex; align-items: center; gap: .5rem; list-style: none; color: var(--foreground); }
 .coverage-notice ul { padding-inline-start: 1rem; margin-top: .75rem; list-style: disc; line-height: 1.5rem; }
-.report-filterbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 1rem 0; margin-bottom: 1.25rem; border-block: 1px solid var(--border); background: var(--background); }
+.report-filterbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 1rem 1.5rem; margin-bottom: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--background); }
 .sample-count { display: flex; align-items: baseline; gap: .5rem; flex-shrink: 0; }
 .sample-count>strong { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
 .sample-count>span { color: var(--muted-foreground); font-size: .75rem; }
@@ -319,7 +319,7 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
   .report-heading { gap: 1rem; }
   .report-title-line { gap: .5rem; }
   .report-actions { width: 100%; }
-  .report-filterbar { gap: .5rem; flex-wrap: wrap; padding-block: .75rem; }
+  .report-filterbar { gap: .5rem; flex-wrap: wrap; padding: .75rem 1rem; }
   .sample-count { flex: 1; }
   .active-filters { flex-basis: 100%; order: 3; }
   .active-filters:empty { display: none; }
