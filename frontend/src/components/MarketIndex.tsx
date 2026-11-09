@@ -9,7 +9,6 @@ const indexNumber=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximum
 
 export function MarketIndexCard({analysis,vacancies}:{analysis:Analysis;vacancies:Vacancy[]}) {
   const index=marketIndex(vacancies,analysisSnapshotAt(analysis));
-  const partial=index.responseCoverage>0&&index.responseCoverage<index.vacancyCount;
   const value=(amount:number|null)=>amount===null?'Нет данных':indexNumber.format(amount);
   return <Card className="market-index-card" data-testid="market-index">
     <CardHeader className="chart-card-header market-index-header">
@@ -25,9 +24,8 @@ export function MarketIndexCard({analysis,vacancies}:{analysis:Analysis;vacancie
     </CardHeader>
     <CardContent className="market-index-content">
       <dl><dt className="sr-only">Индекс рынка</dt><dd className="text-2xl font-semibold tabular-nums" data-testid="market-index-mean">{value(index.meanPerVacancy)}</dd></dl>
-      {(partial||index.meanPerVacancy===null)&&<div className="market-index-notes text-xs leading-relaxed text-muted-foreground">
-        {partial&&<p>Среднее количество откликов рассчитано по вакансиям с известным числом откликов.</p>}
-        {index.meanPerVacancy===null&&<p>{!index.periodEnd?'Не удалось определить дату снимка анализа.':!index.vacancyCount?'В выборке нет загруженных вакансий с датой публикации в этом периоде.':'У вакансий периода нет данных об откликах.'}</p>}
+      {index.meanPerVacancy===null&&<div className="market-index-notes text-xs leading-relaxed text-muted-foreground">
+        <p>{!index.periodEnd?'Не удалось определить дату снимка анализа.':!index.vacancyCount?'В выборке нет загруженных вакансий с датой публикации в этом периоде.':'У вакансий периода нет данных об откликах.'}</p>
       </div>}
     </CardContent>
   </Card>;
