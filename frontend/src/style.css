@@ -161,7 +161,8 @@
 .response-chart { width: 100%; min-width: 0; }
 .chart-axis-caption { color: var(--muted-foreground); font-size: .75rem; margin: 0 0 .25rem .5rem; }
 .chart-legend-note { color: var(--muted-foreground); font-size: .75rem; margin-top: .5rem; }
-.expanded-bars { overflow-x: auto; width: 100%; }
+.graded-chart-scroll { overflow-x: auto; overflow-y: hidden; width: 100%; min-width: 0; }
+.graded-chart-scroll:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .chart-segment, .response-point { cursor: pointer; }
 .chart-segment:hover, .response-point:hover { opacity: .75; }
 .response-point:focus-visible, .chart-segment:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }

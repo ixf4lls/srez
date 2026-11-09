@@ -76,7 +76,7 @@ export function deriveReport(base:Report, vacancies:Vacancy[]):Report {
     return {...m,vacancyIds,count:vacancyIds.length,percent:percent(vacancyIds.length,loaded.length),evidence:m.evidence.filter(e=>ids.has(e.vacancyId))};
   }).filter(m=>m.count>0).sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,'ru'));
   // Preserve source order; charts sort their own copy.
-  const responses=loaded.filter(v=>v.responseCount!=null).map(v=>({id:v.id,title:v.title,count:v.responseCount!}));
+  const responses=loaded.filter(v=>v.responseCount!=null).map(v=>({id:v.id,title:v.title,count:v.responseCount!,grade:v.grade||'Не указан'}));
   return {...base,total:loaded.length,
     dimensions:Object.fromEntries(dimensions.map(({key})=>[key,group(loaded,key)])),
     skills:scope(base.skills),requirements:scope(base.requirements),responses,
@@ -89,7 +89,7 @@ export function deriveReport(base:Report, vacancies:Vacancy[]):Report {
 
 export type Salary = {from:number|null;to:number|null;currency:string;period:string;tax:string;raw:string};
 export type SalaryRates = Record<string, number>;
-export type SalaryPoint = Salary & {id:string;title:string;range:[number,number];normalizedRange:[number,number];normalizedFrom:number|null;normalizedTo:number|null};
+export type SalaryPoint = Salary & {id:string;title:string;grade?:string;range:[number,number];normalizedRange:[number,number];normalizedFrom:number|null;normalizedTo:number|null};
 export type SalaryGroup = {key:string;label:string;points:SalaryPoint[]};
 
 export function salaryAxis(maximum:number) {
@@ -174,7 +174,7 @@ export function salaryGroups(vacancies:Vacancy[],rates:SalaryRates={RUB:1}):Sala
     const range:[number,number]=from!=null&&to!=null&&from!==to?[from,to]:[0,to??from??0];
     const [normalizedFrom,normalizedTo]=normalized;
     const normalizedRange:[number,number]=normalizedFrom!=null&&normalizedTo!=null&&normalizedFrom!==normalizedTo?[normalizedFrom,normalizedTo]:[0,normalizedTo??normalizedFrom??0];
-    group.points.push({...salary,id:v.id,title:v.title,range,normalizedRange,normalizedFrom,normalizedTo});
+    group.points.push({...salary,id:v.id,title:v.title,grade:v.grade||'Не указан',range,normalizedRange,normalizedFrom,normalizedTo});
   }
   return group.points.length?[group]:[];
 }

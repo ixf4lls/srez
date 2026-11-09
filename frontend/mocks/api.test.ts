@@ -19,7 +19,8 @@ test('seed covers every status, relative dates, reports, evidence, categories an
   const report = analysis.report!;
   assert.equal(vacancies.length, analysis.collected);
   assert.equal(report.total, vacancies.filter(v => v.loaded).length);
-  assert.deepEqual(report, deriveReport(report, vacancies));
+  const derived = deriveReport(report, vacancies);
+  assert.deepEqual(derived, { ...report, responses: report.responses.map(point => ({ ...point, grade: vacancies.find(v => v.id === point.id)!.grade || 'Не указан' })) });
   assert.ok(report.dimensions.city.length > 5);
   assert.ok(report.dimensions.company.length > 5);
   assert.ok(vacancies.some(v => v.responseCount === null));
