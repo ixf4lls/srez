@@ -98,10 +98,11 @@
 .history-table-wrap { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; }
 .history-table, .data-table { border-collapse: collapse; width: 100%; text-align: start; }
 .history-table th, .data-table th { padding: .875rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--sidebar); color: var(--muted-foreground); font-size: .75rem; font-weight: 500; text-align: start; }
+.history-table th { padding: .75rem 1.25rem; vertical-align: middle; }
 .history-table td, .data-table td { padding: 1.125rem 1.25rem; border-bottom: 1px solid var(--border); }
 .history-table tbody tr:last-child td { border-bottom: 0; }
 .history-table tbody tr:hover, .data-table tbody tr:hover { background: var(--sidebar); }
-.history-table .history-sort-header { padding: .5rem .75rem; }
+.history-sort-header .history-sort-button { margin-inline: -.5rem; }
 .history-sort-button { width: fit-content; height: 2rem; min-height: 2rem; justify-content: flex-start; padding-inline: .5rem; gap: .375rem; color: var(--foreground); font-family: inherit; font-size: .75rem; font-weight: 500; }
 .history-sort-button[data-active='true'] { font-weight: 600; }
 .history-sort-button>svg { width: .875rem; height: .875rem; color: var(--muted-foreground); }
@@ -114,7 +115,8 @@
 .analysis-name-cell>a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .analysis-name-cell>span { display: block; margin-top: .375rem; color: var(--muted-foreground); font-size: .75rem; line-height: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .history-date { color: var(--muted-foreground); white-space: nowrap; }
-.history-table .history-status { width: 1%; padding-inline: .5rem; white-space: nowrap; }
+.history-table .history-status { width: 1%; white-space: nowrap; }
+.history-table td.history-status { padding-inline: .5rem; }
 .history-status [data-slot='badge'] { background: var(--status-neutral-subtle); color: var(--status-neutral); }
 .history-status[data-status='completed'] [data-slot='badge'] { background: var(--status-success-subtle); color: var(--status-success); }
 .history-status[data-status='cancelled'] [data-slot='badge'] { background: var(--status-warning-subtle); color: var(--status-warning); }
@@ -335,7 +337,7 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
   .analysis-name-cell { grid-column: 1; grid-row: 1; max-width: none; }
   .history-actions { grid-column: 2; grid-row: 1; width: auto; }
   .history-volume { grid-column: 2; grid-row: 2; align-self: center; }
-  .history-table .history-status { grid-column: 1; grid-row: 2; align-self: center; width: auto; padding-inline: 0; }
+  .history-table td.history-status { grid-column: 1; grid-row: 2; align-self: center; width: auto; padding-inline: 0; }
   .history-volume>span { display: none; }
   .undo-toast { gap: .5rem; bottom: 1rem; width: max-content; padding: .75rem; font-size: .75rem; }
   .undo-toast>span { flex: 1; min-width: 0; }
