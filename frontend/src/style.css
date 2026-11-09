@@ -141,13 +141,11 @@
 .report-tabs>[data-slot='tabs-list']>[data-slot='tabs-trigger']:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; box-shadow: none; }
 .tab-count { font-size: .75rem; padding: 0 .25rem; background: var(--muted); border-radius: var(--radius-xs); }
 .report-overview { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 2rem; }
+.report-overview>aside { display: flex; flex-direction: column; min-width: 0; gap: 1.75rem; }
 .series-stack { display: flex; flex-direction: column; min-width: 0; gap: 1.5rem; }
 .chart-card-header { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .chart-card-header [data-slot='card-description'] { margin-top: .5rem; }
-.market-index-card { gap: 1.25rem; }
-.market-index-header { align-items: center; min-height: 1.25rem; }
-.market-index-header [data-slot='card-title'] { line-height: 1.25rem; }
-.market-index-help { margin-block: -.75rem; margin-inline-end: -.75rem; }
+.market-index-card { width: 100%; }
 .market-index-content { display: flex; flex-direction: column; gap: 1.25rem; }
 .market-index-notes { display: flex; flex-direction: column; gap: .5rem; }
 .market-index-formula { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .75rem; font-size: .75rem; line-height: 1.25rem; }
@@ -355,9 +353,9 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
   .source-data, .source-chart { padding: 1rem; }
   .collection-stats { gap: .75rem; }
   .collection-stats span { min-height: 2rem; }
-  [data-slot='button'], [data-slot='icon-button'] { min-height: 2.75rem; }
+  [data-slot='button'], [data-slot='icon-button'], .market-index-help { min-height: 2.75rem; }
   [data-slot='input'], [data-slot='native-select'] { min-height: 2.75rem; }
-  [data-slot='icon-button'] { min-width: 2.75rem; }
+  [data-slot='icon-button'], .market-index-help { min-width: 2.75rem; }
   [data-slot='dialog-close'], [data-slot='sheet-content']>button:last-child { padding: .625rem; top: .5rem; right: .5rem; }
   .filter-chip { min-height: 2rem; }
 }
