@@ -189,7 +189,7 @@
 .breakdown-track { grid-column: 1/-1; background: var(--muted); height: .25rem; border-radius: var(--radius-full); overflow: hidden; }
 :root:not(.dark) .breakdown-track, :root:not(.dark) .metric-table-row .metric-track { background: var(--secondary); }
 .breakdown-track>span { display: block; height: 100%; border-radius: inherit; }
-.breakdown-row:hover .breakdown-label { text-decoration: underline; text-underline-offset: 3px; }
+button.breakdown-row:hover .breakdown-label { text-decoration: underline; text-underline-offset: 3px; }
 .back-to-history { margin-bottom: 1.25rem; }
 .report-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .filter-sheet { overflow-y: auto; }

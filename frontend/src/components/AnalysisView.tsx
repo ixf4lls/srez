@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api, date, isActive, number } from '../types';
 import { relativeDate } from '../dates';
+import { gradeColor } from '../chartGrades';
 import type { Analysis, Metric, Report, Vacancy } from '../types';
 import { deriveReport, dimensions, filterVacancies, readViewFilters, salaryGroups } from '../analytics';
 import type { Dimension, SalaryRates, ViewFilters } from '../analytics';
@@ -23,6 +24,7 @@ import { DeleteAnalysisDialog } from './DeleteAnalysisDialog';
 import { Companies } from './Companies';
 
 type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
+const sidebarDimensions = (['grade', 'experience', 'format'] as const).map(key => dimensions.find(dimension => dimension.key === key)!);
 
 export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string; navigate: (s: string) => void; onRepeat: (a: Analysis) => void; onChanged: () => void }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -104,7 +106,10 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   if (!analysis) return error ? <ErrorNotice retry={() => void refresh()}>{error}</ErrorNotice> : <LoadingState text="Загружаем анализ" />;
   const a = analysis;
   const canResume = !active && (['cancelled', 'attention', 'interrupted'].includes(a.status) || (a.status === 'partial' && (a.failed > 0 || (a.found > a.collected && a.nextPage < 40))));
-  const breakdowns = (report: Report) => <div className="breakdown-stack">{dimensions.map(({ key, title }) => <Breakdown key={key} title={title} dimension={key} metrics={report.dimensions[key] || []} selected={filters[key] || []} onToggle={value => toggleFilter(key, value)} onSources={() => { setShowFilters(false); setExploration({ title, dimension: key === 'format' ? 'workFormats' : key, metrics: report.dimensions[key] || [], filterDimension: key }); }} />)}</div>;
+  const breakdowns = (report: Report, mode: 'filters' | 'summary') => {
+    const canFilter = mode === 'filters';
+    return <div className="breakdown-stack">{(canFilter ? dimensions : sidebarDimensions).map(({ key, title }) => <Breakdown key={key} title={title} dimension={key} metrics={report.dimensions[key] || []} selected={canFilter ? filters[key] || [] : []} onToggle={canFilter ? value => toggleFilter(key, value) : undefined} onSources={() => { setShowFilters(false); setExploration({ title, dimension: key === 'format' ? 'workFormats' : key, metrics: report.dimensions[key] || [], filterDimension: canFilter ? key : undefined }); }} />)}</div>;
+  };
 
   return <>
     <Button variant="ghost" size="sm" className="back-to-history" onClick={() => navigate('/history')}><ArrowLeft data-icon="inline-start" />История анализов</Button>
@@ -130,12 +135,12 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
               {r.responses.length ? <><div className="chart-stat"><strong>{r.responseMean == null ? 'Нет данных' : number(r.responseMean)}</strong><span>откликов в среднем</span></div><ResponsePlot points={r.responses} mean={r.responseMean} onChoose={vacancyId => setExploration({ title: 'Отклики', dimension: 'responses', points: r.responses, vacancyId })} /><div className="chart-footer"><span>Данные по {number(r.responseCoverage)} из {number(r.total)} вакансий</span><Button variant="ghost" size="xs" onClick={() => setExploration({ title: 'Отклики', dimension: 'responses', points: r.responses })}><Database data-icon="inline-start" />Источники</Button></div></> : <EmptyState title="Нет данных об откликах" description="В сохранённых вакансиях число откликов недоступно." />}
             </CardContent></Card>
             <div className="report-reading-note"><Check size={15} aria-hidden="true" /><p>Каждая точка связана с исходной вакансией. Нажмите на неё, чтобы проверить данные.</p></div>
-          </div><aside aria-label="Распределение вакансий">{breakdowns(r)}</aside></div> : <EmptyState title={filtered ? 'По выбранным фильтрам вакансий нет' : 'Вакансии не найдены'} description={filtered ? 'Сбросьте условия или выберите другое сочетание категорий.' : 'Измените запрос и повторите поиск.'} action={<Button variant="outline" onClick={() => filtered ? setFilters({}) : onRepeat(a)}>{filtered ? 'Сбросить фильтры' : 'Изменить запрос'}</Button>} />}</TabsContent>
+          </div><aside aria-label="Распределение вакансий">{breakdowns(r, 'summary')}</aside></div> : <EmptyState title={filtered ? 'По выбранным фильтрам вакансий нет' : 'Вакансии не найдены'} description={filtered ? 'Сбросьте условия или выберите другое сочетание категорий.' : 'Измените запрос и повторите поиск.'} action={<Button variant="outline" onClick={() => filtered ? setFilters({}) : onRepeat(a)}>{filtered ? 'Сбросить фильтры' : 'Изменить запрос'}</Button>} />}</TabsContent>
           <TabsContent value="requirements"><Requirements report={r} onOpen={context => setExploration(context)} /></TabsContent>
           <TabsContent value="vacancies"><VacancyBrowser vacancies={filtered ? scoped : vacancies} /></TabsContent>
           <TabsContent value="companies"><Companies vacancies={scoped} onOpen={metric => setExploration({ title: `Вакансии: ${metric.label}`, dimension: 'company', metrics: [metric], metric })} /></TabsContent>
         </Tabs>
-        <Sheet open={showFilters} onOpenChange={setShowFilters}><SheetContent className="filter-sheet" aria-describedby={undefined}><SheetHeader><SheetTitle>Фильтры отчёта</SheetTitle></SheetHeader><div className="filter-sheet-content"><p className="field-hint">Внутри категории условия объединяются через ИЛИ, между категориями через И.</p>{unfilteredReport && breakdowns(unfilteredReport)}<Button variant="outline" onClick={() => setFilters({})}>Сбросить фильтры</Button></div></SheetContent></Sheet>
+        <Sheet open={showFilters} onOpenChange={setShowFilters}><SheetContent className="filter-sheet" aria-describedby={undefined}><SheetHeader><SheetTitle>Фильтры отчёта</SheetTitle></SheetHeader><div className="filter-sheet-content"><p className="field-hint">Внутри категории условия объединяются через ИЛИ, между категориями через И.</p>{unfilteredReport && breakdowns(unfilteredReport, 'filters')}<Button variant="outline" onClick={() => setFilters({})}>Сбросить фильтры</Button></div></SheetContent></Sheet>
       </>}
     </>}
     <Explorer context={exploration} vacancies={filtered ? scoped : vacancies} onClose={() => setExploration(null)} onFilter={applySourceFilter} />
@@ -144,10 +149,22 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   </>;
 }
 
-function Breakdown({ title, dimension, metrics, selected, onToggle, onSources }: { title: string; dimension: Dimension; metrics: Metric[]; selected: string[]; onToggle: (value: string) => void; onSources: () => void }) {
+function Breakdown({ title, dimension, metrics, selected, onToggle, onSources }: { title: string; dimension: Dimension; metrics: Metric[]; selected: string[]; onToggle?: (value: string) => void; onSources: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? metrics : metrics.slice(0, 5);
-  return <section className="breakdown" data-testid={`dimension-${dimension}`}><div className="breakdown-heading"><h2>{title}</h2><IconButton variant="ghost" size="xs" aria-label={`Источники: ${title}`} onClick={onSources}><Database /></IconButton></div>{dimension === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}<div className="breakdown-rows">{visible.map((m, i) => <button key={m.key} className="breakdown-row" aria-pressed={selected.includes(m.label)} disabled={!m.count && !selected.includes(m.label)} onClick={() => onToggle(m.label)}><span className="breakdown-label">{selected.includes(m.label) && <Check size={12} aria-hidden="true" />}{m.label}</span><span className="breakdown-values"><span>{number(m.count)}</span><strong>{number(m.percent)}%</strong></span><span className="breakdown-track"><span style={{ width: `${m.percent}%`, background: `var(--chart-${i % 5 + 1})` }} /></span></button>)}</div>{!metrics.length && <p className="field-hint">Нет данных в текущей выборке.</p>}{metrics.length > 5 && <Button variant="ghost" size="xs" className="breakdown-expand" onClick={() => setExpanded(!expanded)}>{expanded ? 'Свернуть' : `Все категории (${metrics.length})`}<ChevronDown data-icon="inline-end" className={expanded ? 'rotate' : ''} /></Button>}</section>;
+  return <section className="breakdown" data-testid={`dimension-${dimension}`}>
+    <div className="breakdown-heading"><h2>{title}</h2><IconButton variant="ghost" size="xs" aria-label={`Источники: ${title}`} onClick={onSources}><Database /></IconButton></div>
+    {dimension === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}
+    <div className="breakdown-rows">{visible.map((m, i) => {
+      const color = dimension === 'grade' && !onToggle ? gradeColor(m.label) : `var(--chart-${i % 5 + 1})`;
+      const content = <><span className="breakdown-label">{selected.includes(m.label) && <Check size={12} aria-hidden="true" />}{m.label}</span><span className="breakdown-values"><span>{number(m.count)}</span><strong>{number(m.percent)}%</strong></span><span className="breakdown-track"><span style={{ width: `${m.percent}%`, background: color }} /></span></>;
+      return onToggle
+        ? <button key={m.key} className="breakdown-row" aria-pressed={selected.includes(m.label)} disabled={!m.count && !selected.includes(m.label)} onClick={() => onToggle(m.label)}>{content}</button>
+        : <div key={m.key} className="breakdown-row">{content}</div>;
+    })}</div>
+    {!metrics.length && <p className="field-hint">Нет данных в текущей выборке.</p>}
+    {metrics.length > 5 && <Button variant="ghost" size="xs" className="breakdown-expand" onClick={() => setExpanded(!expanded)}>{expanded ? 'Свернуть' : `Все категории (${metrics.length})`}<ChevronDown data-icon="inline-end" className={expanded ? 'rotate' : ''} /></Button>}
+  </section>;
 }
 
 function Requirements({ report, onOpen }: { report: Report; onOpen: (context: Exploration) => void }) {
