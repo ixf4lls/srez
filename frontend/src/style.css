@@ -146,8 +146,12 @@
 .series-stack { display: flex; flex-direction: column; min-width: 0; gap: 1.5rem; }
 .chart-card-header { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; gap: 1rem; }
 .chart-card-header [data-slot='card-description'] { margin-top: .5rem; }
-.market-index-header { align-items: center; }
-.market-index-help { margin-inline-end: -.75rem; }
+.market-index-card { gap: 1.25rem; }
+.market-index-header { align-items: center; min-height: 1.25rem; }
+.market-index-header [data-slot='card-title'] { line-height: 1.25rem; }
+.market-index-help { margin-block: -.75rem; margin-inline-end: -.75rem; }
+.market-index-content { display: flex; flex-direction: column; gap: 1.25rem; }
+.market-index-notes { display: flex; flex-direction: column; gap: .5rem; }
 .chart-footer { display: flex; justify-content: space-between; align-items: center; gap: .75rem; border-top: 1px solid var(--border); padding-top: .875rem; margin-top: .75rem; color: var(--muted-foreground); font-size: .75rem; }
 .chart-stat { display: flex; align-items: baseline; gap: .5rem; margin-bottom: 1.5rem; }
 .chart-stat>strong { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
