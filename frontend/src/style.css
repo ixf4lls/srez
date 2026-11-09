@@ -137,8 +137,8 @@
 .filter-chip>span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-chip:hover { border-color: var(--ring); }
 .report-tabs { gap: 2rem; }
-.report-tabs>[data-slot='tabs-list'] { width: 100%; justify-content: flex-start; }
-.report-tabs>[data-slot='tabs-list']>[data-slot='tabs-trigger'] { flex: initial; height: 2.5rem; padding-inline: 1rem; }
+.report-tabs>[data-slot='tabs-list'] { width: 100%; justify-content: flex-start; overflow-x: auto; }
+.report-tabs>[data-slot='tabs-list']>[data-slot='tabs-trigger'] { flex: 0 0 auto; height: 2.75rem; padding-inline: 1rem; }
 .tab-count { font-size: .75rem; padding: 0 .25rem; background: var(--muted); border-radius: var(--radius-xs); }
 .report-overview { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 2rem; }
 .series-stack { display: flex; flex-direction: column; min-width: 0; gap: 1.5rem; }
@@ -251,6 +251,10 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
 .source-original-salary { display: block; margin-top: .5rem; font-size: .75rem; color: var(--muted-foreground); }
 .inline-link { text-align: start; text-decoration: underline; text-underline-offset: 3px; }
 .inline-link:hover { color: var(--chart-5); }
+.company-link { min-height: 2.75rem; overflow-wrap: anywhere; }
+.companies-table { table-layout: fixed; }
+.companies-table th:first-child { width: 50%; }
+.companies-table th, .companies-table td { padding: .75rem; }
 .collection-card { max-width: 46rem; margin: 2rem auto; }
 .collection-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; margin: .5rem 0 2rem; }
 .collection-stats>div { display: flex; flex-direction: column; gap: .5rem; }

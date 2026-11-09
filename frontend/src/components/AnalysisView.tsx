@@ -19,6 +19,7 @@ import { ResponsePlot, SalaryPlot } from './VacancyCharts';
 import { VacancyBrowser } from './Vacancies';
 import { EmptyState, ErrorNotice, LoadingState, StatusBadge } from './AppUI';
 import { DeleteAnalysisDialog } from './DeleteAnalysisDialog';
+import { Companies } from './Companies';
 
 type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
 
@@ -116,7 +117,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
       {r && <>
         {(a.warnings?.length > 0 || a.found > loadedTotal) && <details className="coverage-notice"><summary>Охват данных: {number(loadedTotal)} из {number(a.found || a.collected)} вакансий<ChevronDown size={14} /></summary><ul>{[...new Set(a.warnings || [])].map((warning, i) => <li key={i}>{warning}</li>)}{!a.warnings?.length && <li>Часть найденных вакансий не загружена. Метрики рассчитаны по сохранённым описаниям.</li>}</ul></details>}
         <div className="report-filterbar"><div className="sample-count"><strong data-testid="vacancy-count">{number(r.total)}</strong><span>{filtered ? `из ${number(loadedTotal)} вакансий` : 'вакансий в выборке'}</span></div><div className="active-filters">{dimensions.flatMap(({ key, title }) => (filters[key] || []).map(value => <button className="filter-chip" key={`${key}-${value}`} onClick={() => toggleFilter(key, value)} aria-label={`Убрать фильтр ${title}: ${value}`}><span>{value}</span><X size={12} /></button>))}</div>{filtered && <Button variant="ghost" size="sm" onClick={() => setFilters({})}>Сбросить</Button>}<Button variant="outline" size="sm" onClick={() => setShowFilters(true)}><SlidersHorizontal data-icon="inline-start" />Фильтры</Button></div>
-        <Tabs value={tab} onValueChange={setTab} variant="line" className="report-tabs"><TabsList variant="line" aria-label="Разделы отчёта"><TabsTrigger value="overview">Обзор</TabsTrigger><TabsTrigger value="requirements">Навыки и требования</TabsTrigger><TabsTrigger value="vacancies">Вакансии <span className="tab-count">{number((filtered ? scoped : vacancies).length)}</span></TabsTrigger></TabsList>
+        <Tabs value={tab} onValueChange={setTab} variant="line" className="report-tabs"><TabsList variant="line" aria-label="Разделы отчёта"><TabsTrigger value="overview">Обзор</TabsTrigger><TabsTrigger value="requirements">Навыки и требования</TabsTrigger><TabsTrigger value="vacancies">Вакансии <span className="tab-count">{number((filtered ? scoped : vacancies).length)}</span></TabsTrigger><TabsTrigger value="companies">Компании</TabsTrigger></TabsList>
           <TabsContent value="overview">{r.total ? <div className="report-overview"><div className="series-stack">
             <MarketIndexCard analysis={a} vacancies={scoped} />
             <Card data-testid="salary-chart"><CardHeader className="chart-card-header"><div><CardTitle>Зарплаты</CardTitle><CardDescription>Рубли в месяц, на руки</CardDescription></div><IconButton variant="ghost" aria-label="Развернуть график зарплат" disabled={!salaryGroup} onClick={() => setExploration({ title: 'Зарплаты', dimension: 'salary', salaries: salaryGroup?.points, salaryLabel: salaryGroup?.label, expanded: true })}><Expand /></IconButton></CardHeader><CardContent>
@@ -132,6 +133,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
           </div><aside aria-label="Распределение вакансий">{breakdowns(r)}</aside></div> : <EmptyState title={filtered ? 'По выбранным фильтрам вакансий нет' : 'Вакансии не найдены'} description={filtered ? 'Сбросьте условия или выберите другое сочетание категорий.' : 'Измените запрос и повторите поиск.'} action={<Button variant="outline" onClick={() => filtered ? setFilters({}) : onRepeat(a)}>{filtered ? 'Сбросить фильтры' : 'Изменить запрос'}</Button>} />}</TabsContent>
           <TabsContent value="requirements"><Requirements report={r} onOpen={context => setExploration(context)} /></TabsContent>
           <TabsContent value="vacancies"><VacancyBrowser vacancies={filtered ? scoped : vacancies} /></TabsContent>
+          <TabsContent value="companies"><Companies vacancies={scoped} onOpen={metric => setExploration({ title: `Вакансии: ${metric.label}`, dimension: 'company', metrics: [metric], metric })} /></TabsContent>
         </Tabs>
         <Sheet open={showFilters} onOpenChange={setShowFilters}><SheetContent className="filter-sheet" aria-describedby={undefined}><SheetHeader><SheetTitle>Фильтры отчёта</SheetTitle></SheetHeader><div className="filter-sheet-content"><p className="field-hint">Внутри категории условия объединяются через ИЛИ, между категориями через И.</p>{unfilteredReport && breakdowns(unfilteredReport)}<Button variant="outline" onClick={() => setFilters({})}>Сбросить фильтры</Button></div></SheetContent></Sheet>
       </>}
