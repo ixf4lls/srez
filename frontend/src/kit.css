@@ -53,6 +53,18 @@
   --mint-pale: #e3fee3;
 }
 
+.dark {
+  --ink: var(--foreground);
+  --ink-soft: var(--muted-foreground);
+  --canvas: var(--background);
+  --surface: var(--card);
+  --line: var(--border);
+  --violet-pale: var(--accent);
+  --violet-dark: #c4a1ff;
+}
+.dark .coverage-notice { background: var(--surface); }
+.dark .empty-state { color: var(--muted-foreground); }
+
 html { scroll-behavior: auto; }
 body { min-width: 320px; font-family: Gotham, Arial, sans-serif; background: var(--canvas); color: var(--ink); }
 button, input, textarea, select { font-family: inherit; }
