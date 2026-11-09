@@ -5,7 +5,7 @@ const labels: Record<string, string> = {
   'География': 'Location',
   'Регион': 'Region',
   'Формат работы': 'Work format',
-  'Формат оформления': 'Engagement type',
+  'Способ оформления': 'Engagement type',
   'Занятость': 'Employment',
   'Опыт работы': 'Experience',
   'Образование': 'Education',

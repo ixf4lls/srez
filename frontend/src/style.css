@@ -184,6 +184,7 @@
 .breakdown-row[aria-pressed='true'] .breakdown-label { font-weight: 600; color: var(--chart-4); }
 .breakdown-values { display: flex; align-items: center; gap: .625rem; font-size: .75rem; font-variant-numeric: tabular-nums; }
 .breakdown-values>span { color: var(--muted-foreground); }
+.breakdown[data-dimension='employmentForm'] .breakdown-values>span { color: var(--foreground); }
 .breakdown-values>strong { font-weight: 500; min-width: 2.75rem; text-align: end; }
 .breakdown-track { grid-column: 1/-1; background: var(--muted); height: .25rem; border-radius: var(--radius-full); overflow: hidden; }
 :root:not(.dark) .breakdown-track, :root:not(.dark) .metric-table-row .metric-track { background: var(--secondary); }

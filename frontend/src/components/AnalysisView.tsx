@@ -24,7 +24,7 @@ import { DeleteAnalysisDialog } from './DeleteAnalysisDialog';
 import { Companies } from './Companies';
 
 type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
-const sidebarDimensions = (['grade', 'experience', 'format'] as const).map(key => dimensions.find(dimension => dimension.key === key)!);
+const sidebarDimensions = (['grade', 'experience', 'format', 'employmentForm'] as const).map(key => dimensions.find(dimension => dimension.key === key)!);
 const sidebarCategoryOrder: Partial<Record<Dimension, readonly string[]>> = {
   grade: ['Junior', 'Middle', 'Senior', 'Lead', 'Не указан'],
   experience: ['Нет опыта', 'От 1 года до 3 лет', 'От 3 до 6 лет', 'Более 6 лет', 'Не указан'],
@@ -163,7 +163,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
 function Breakdown({ title, dimension, metrics, selected, onToggle, onSources }: { title: string; dimension: Dimension; metrics: Metric[]; selected: string[]; onToggle?: (value: string) => void; onSources: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? metrics : metrics.slice(0, 5);
-  return <section className="breakdown" data-testid={`dimension-${dimension}`}>
+  return <section className="breakdown" data-dimension={dimension} data-testid={`dimension-${dimension}`}>
     <div className="breakdown-heading"><div><h2>{title}</h2>{dimension === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}</div><IconButton variant="ghost" size="xs" aria-label={`Источники: ${title}`} onClick={onSources}><Database /></IconButton></div>
     <div className="breakdown-rows">{visible.map((m, i) => {
       const color = dimension === 'grade' && !onToggle ? gradeColor(m.label) : `var(--chart-${i % 5 + 1})`;
