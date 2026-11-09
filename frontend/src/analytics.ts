@@ -1,11 +1,11 @@
 import type {Metric,Report,Vacancy} from './types.ts';
 
 export const dimensions = [
-  {key:'city', title:'Location'},
-  {key:'format', title:'Work format'},
-  {key:'employmentForm', title:'Engagement type'},
-  {key:'experience', title:'Experience'},
-  {key:'grade', title:'Seniority'},
+  {key:'city', title:'География'},
+  {key:'format', title:'Формат работы'},
+  {key:'employmentForm', title:'Формат оформления'},
+  {key:'experience', title:'Опыт работы'},
+  {key:'grade', title:'Грейд'},
   {key:'company', title:'Компания'},
 ] as const;
 export type Dimension = typeof dimensions[number]['key'];
