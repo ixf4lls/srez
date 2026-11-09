@@ -137,8 +137,9 @@
 .filter-chip>span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-chip:hover { border-color: var(--ring); }
 .report-tabs { gap: 2rem; }
-.report-tabs>[data-slot='tabs-list'] { width: 100%; height: auto; min-height: 2.75rem; justify-content: flex-start; overflow-x: auto; }
+.report-tabs>[data-slot='tabs-list'] { width: 100%; height: auto; min-height: 2.75rem; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; }
 .report-tabs>[data-slot='tabs-list']>[data-slot='tabs-trigger'] { flex: 0 0 auto; height: 2.75rem; padding-inline: 1rem; }
+.report-tabs>[data-slot='tabs-list']>[data-slot='tabs-trigger']:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; box-shadow: none; }
 .tab-count { font-size: .75rem; padding: 0 .25rem; background: var(--muted); border-radius: var(--radius-xs); }
 .report-overview { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 2rem; }
 .series-stack { display: flex; flex-direction: column; min-width: 0; gap: 1.5rem; }
