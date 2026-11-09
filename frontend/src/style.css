@@ -34,6 +34,7 @@
 .history-nav[aria-current='page'] { background: var(--canvas); }
 .history-nav:active { background: color-mix(in srgb, var(--foreground) 14%, var(--canvas)); }
 .content-page { max-width: var(--page-width); margin: 0 auto; padding: 2rem var(--page-gutter) 4rem; min-width: 0; outline: none; }
+.history-content { max-width: 70rem; }
 .hero-main { flex: 1; min-height: calc(100svh - 5.5rem); display: grid; place-items: center; padding: 2rem var(--page-gutter) 11rem; outline: none; }
 .hero-content { width: 100%; max-width: 48rem; min-width: 0; }
 .hero-heading { text-align: center; margin-bottom: 3rem; }

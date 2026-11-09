@@ -65,7 +65,7 @@ export default function App() {
       <Button asChild variant="ghost" className="history-nav"><a href="/history" onClick={historyLink} aria-current={path === '/history' ? 'page' : undefined}><History data-icon="inline-start" aria-hidden="true" />История</a></Button>
       <IconButton variant="ghost" className="theme-toggle" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} title={dark ? 'Светлая тема' : 'Тёмная тема'} onClick={() => setDark(!dark)}>{dark ? <Sun /> : <Moon />}</IconButton>
     </nav></header>
-    <main id="main-content" className={hero ? 'hero-main' : 'content-page'} tabIndex={-1}>
+    <main id="main-content" className={hero ? 'hero-main' : path === '/history' ? 'content-page history-content' : 'content-page'} tabIndex={-1}>
       {id ? <Suspense fallback={<LoadingState text="Загружаем отчёт" />}><AnalysisView key={id} id={id} navigate={navigate} onChanged={() => void refresh()} onRepeat={a => { setRepeat(a); setFormKey(k => k + 1); navigate('/'); }} /></Suspense>
         : path === '/history' ? <HistoryView analyses={analyses} loading={historyLoading} error={historyError} navigate={navigate} refresh={refresh} onNew={() => newAnalysis()} />
         : hero ? <SearchForm key={formKey} initial={repeat} onCreated={a => { setRepeat(null); navigate(`/analyses/${a.id}`); }} />
