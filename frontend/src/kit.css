@@ -215,7 +215,6 @@ p { line-height: 1.6; }
 .report-actions .button { min-height: 40px; padding: 9px 13px; font-size: 12px; }
 .analysis-heading .report-query { margin: 19px 0 0; gap: 11px; }
 .analysis-heading .report-query > button { color: var(--violet-dark); font-size: 12px; font-weight: 700; }
-.report-query code { padding: 14px 17px; border: 1px solid #d3bff9; border-radius: 8px; background: var(--violet-pale); color: #361f61; font-family: Gotham, Arial, sans-serif; font-size: 12px; line-height: 1.6; }
 .report-filter-tags { gap: 6px; }
 .analysis-filterbar { top: 76px; min-height: 72px; margin-bottom: 23px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 4px 13px rgb(11 11 11 / 5%); }
 .vacancy-count { color: var(--ink-soft); font-size: 13px; }
