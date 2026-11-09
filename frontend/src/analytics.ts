@@ -6,10 +6,15 @@ export const dimensions = [
   {key:'employmentForm', title:'Engagement type'},
   {key:'experience', title:'Experience'},
   {key:'grade', title:'Seniority'},
+  {key:'company', title:'Компания'},
 ] as const;
 export type Dimension = typeof dimensions[number]['key'];
 export type ViewFilters = Partial<Record<Dimension,string[]>>;
 export const formats = ['Офис','Удалённо','Гибрид'] as const;
+
+export function companyName(v:Vacancy):string {
+  return v.company?.trim()||'Компания не указана';
+}
 
 export function workFormats(v:Vacancy):string[] {
   const text=[...(v.workFormats||[]),v.format||''].join(' ').toLowerCase();
@@ -37,6 +42,7 @@ export function matches(v:Vacancy, filters:ViewFilters):boolean {
     if(!selected?.length)return true;
     if(key==='format')return selected.some(value=>workFormats(v).includes(value));
     if(key==='employmentForm')return selected.some(value=>employmentForms(v).includes(value));
+    if(key==='company')return selected.includes(companyName(v));
     return selected.includes(v[key]||'Не указан');
   });
 }
@@ -50,7 +56,7 @@ function group(vacancies:Vacancy[],key:Dimension):Metric[] {
   const groups=new Map<string,Metric>();
   if(key==='format')for(const label of formats)groups.set(label,{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]});
   for(const v of vacancies){
-    const values=key==='format'?workFormats(v):key==='employmentForm'?employmentForms(v):[v[key]||'Не указан'];
+    const values=key==='format'?workFormats(v):key==='employmentForm'?employmentForms(v):key==='company'?[companyName(v)]:[v[key]||'Не указан'];
     for(const label of values){
       const m=groups.get(label)??{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]};
       m.count++;m.vacancyIds.push(v.id);
