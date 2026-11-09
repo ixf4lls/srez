@@ -65,6 +65,7 @@ function Button({ className, variant, size, asChild = false, ...props }: ButtonP
   return (
     <Comp
       data-slot="button"
+      data-motion="button"
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />

@@ -2,74 +2,111 @@
 /*! Animate.css 4.1.1, Copyright (c) 2020 Daniel Eden. MIT license: /licenses/animate.css.txt */
 
 :root {
-  --motion-feedback: 120ms;
-  --motion-enter: 200ms;
-  --motion-ease: cubic-bezier(.2, .7, .2, 1);
+  --motion-feedback: 220ms;
+  --motion-enter: 600ms;
+  --motion-content: 420ms;
+  --motion-ease: cubic-bezier(.22, .61, .36, 1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  @keyframes content-reveal {
+    from { transform: translateY(8px); }
+    to { transform: none; }
+  }
+
   .hero-content,
   .page-heading,
   .report-heading,
+  .history-toolbar,
   .history-table-wrap,
   .collection-card,
-  .empty-state {
+  .empty-state,
+  .report-overview > .series-stack > [data-slot='card'],
+  .report-overview > aside {
+    animation: fadeIn var(--motion-enter) var(--motion-ease),
+      content-reveal var(--motion-enter) var(--motion-ease);
+  }
+
+  .history-table-wrap,
+  .report-overview > .series-stack > [data-slot='card']:nth-child(2) {
+    animation-delay: 80ms;
+    animation-fill-mode: backwards;
+  }
+
+  .report-overview > aside {
+    animation-delay: 120ms;
+    animation-fill-mode: backwards;
+  }
+
+  .report-query,
+  .report-filterbar,
+  .report-tabs > [data-slot='tabs-list'] {
     animation: fadeIn var(--motion-enter) var(--motion-ease);
   }
 
-  .report-tabs > [data-slot='tabs-content'][data-state='active'],
+  .report-tabs > [data-slot='tabs-content'][data-state='active']:not(.overview-panel),
+  .source-tabs > [data-slot='tabs-content'][data-state='active'],
   .report-query[open] > .query-parameters,
-  .salary-method[open] > div,
-  .error-notice,
-  .undo-toast {
-    animation: fadeIn 160ms var(--motion-ease);
+  .salary-method[open] > div {
+    animation: fadeIn var(--motion-content) var(--motion-ease),
+      content-reveal var(--motion-content) var(--motion-ease);
   }
 
-  [data-slot='button'],
-  [data-slot='icon-button'],
+  .loading-state,
+  .error-notice,
+  .undo-toast {
+    animation: fadeIn 300ms var(--motion-ease);
+  }
+
+  [data-motion='button'],
+  [data-motion='icon-button'],
   [data-slot='tabs-trigger'],
   .filter-chip {
-    transition-property: background-color, border-color, color, box-shadow, scale, translate;
+    transition-property: background-color, border-color, color, box-shadow, transform;
     transition-duration: var(--motion-feedback);
     transition-timing-function: var(--motion-ease);
   }
 
-  [data-slot='button']:not(.history-sort-button):active:not(:disabled, [aria-disabled='true']),
+  [data-motion='button']:not(.history-sort-button):active:not(:disabled, [aria-disabled='true']),
   .filter-chip:active:not(:disabled) {
-    scale: .98;
+    transform: scale(.97);
+    transition-duration: 120ms;
   }
 
-  [data-slot='icon-button']:active:not(:disabled, [aria-disabled='true']) {
-    scale: .94;
-  }
-
-  .hero-submit:active:not(:disabled) {
-    translate: 0 0;
+  [data-motion='icon-button']:active:not(:disabled, [aria-disabled='true']) {
+    transform: scale(.92);
+    transition-duration: 120ms;
   }
 
   .hero-search-row,
   .history-table tbody tr,
-  .metric-table-row {
+  .metric-table-row,
+  .vacancy-list-row {
     transition: background-color var(--motion-feedback) var(--motion-ease),
       border-color var(--motion-feedback) var(--motion-ease),
       box-shadow var(--motion-feedback) var(--motion-ease);
   }
 
+  .chart-segment,
+  .response-point {
+    transition: opacity var(--motion-feedback) var(--motion-ease);
+  }
+
   .report-query summary > svg,
   .salary-method summary > svg {
-    transition: transform 160ms var(--motion-ease);
+    transition: transform 280ms var(--motion-ease);
   }
 
   [data-slot='popover-content'],
   [data-slot='dialog-content'],
   [data-slot='dialog-overlay'],
   [data-slot='sheet-overlay'] {
-    animation-duration: 180ms;
+    animation-duration: 400ms;
     animation-timing-function: var(--motion-ease);
   }
 
   [data-slot='sheet-content'] {
-    animation-duration: 240ms;
+    animation-duration: 460ms;
     animation-timing-function: var(--motion-ease);
   }
 
@@ -80,7 +117,9 @@
 }
 
 @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
-  .hero-submit:hover:not(:disabled):not(:active) {
-    translate: 0 -1px;
+  [data-motion='button']:not(.history-sort-button):hover:not(:disabled, [aria-disabled='true']):not(:active),
+  [data-motion='icon-button']:hover:not(:disabled, [aria-disabled='true']):not(:active),
+  .filter-chip:hover:not(:disabled):not(:active) {
+    transform: translateY(-2px);
   }
 }

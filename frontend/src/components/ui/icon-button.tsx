@@ -52,6 +52,7 @@ function IconButton({ className, variant, size, asChild = false, ...props }: Ico
   return (
     <Comp
       data-slot="icon-button"
+      data-motion="icon-button"
       className={cn(iconButtonVariants({ variant, size }), className)}
       {...props}
     />
