@@ -75,7 +75,7 @@ export function deriveReport(base:Report, vacancies:Vacancy[]):Report {
     const vacancyIds=[...new Set(m.vacancyIds)].filter(id=>ids.has(id));
     return {...m,vacancyIds,count:vacancyIds.length,percent:percent(vacancyIds.length,loaded.length),evidence:m.evidence.filter(e=>ids.has(e.vacancyId))};
   }).filter(m=>m.count>0).sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,'ru'));
-  // A stable vacancy order; the connecting line does not rank results by response count.
+  // Preserve source order; charts sort their own copy.
   const responses=loaded.filter(v=>v.responseCount!=null).map(v=>({id:v.id,title:v.title,count:v.responseCount!}));
   return {...base,total:loaded.length,
     dimensions:Object.fromEntries(dimensions.map(({key})=>[key,group(loaded,key)])),

@@ -14,7 +14,7 @@ function ResponseDot({ cx, cy, payload, onChoose, active = false }: { cx?: numbe
 }
 
 export function ResponsePlot({ points, mean, onChoose, expanded = false }: { points: ResponsePoint[]; mean: number | null; onChoose: (id: string) => void; expanded?: boolean }) {
-  const data = points.map((p, i) => ({ ...p, index: i + 1 }));
+  const data = [...points].sort((a, b) => a.count - b.count).map((p, i) => ({ ...p, index: i + 1 }));
   const chart = <ResponsiveContainer width="100%" height={expanded ? 400 : 280}><LineChart data={data} margin={margin}>
     <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
     <XAxis dataKey="index" hide />
