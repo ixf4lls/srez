@@ -107,6 +107,10 @@
 .analysis-name-cell>span { display: block; margin-top: .375rem; color: var(--muted-foreground); font-size: .75rem; line-height: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .history-date { color: var(--muted-foreground); white-space: nowrap; }
 .history-table .history-status { width: 1%; padding-inline: .5rem; white-space: nowrap; }
+.history-status [data-slot='badge'] { background: var(--status-neutral-subtle); color: var(--status-neutral); }
+.history-status[data-status='completed'] [data-slot='badge'] { background: var(--status-success-subtle); color: var(--status-success); }
+.history-status[data-status='cancelled'] [data-slot='badge'] { background: var(--status-warning-subtle); color: var(--status-warning); }
+.history-status[data-status='interrupted'] [data-slot='badge'] { background: var(--status-danger-subtle); color: var(--status-danger); }
 .numeric { text-align: end!important; font-variant-numeric: tabular-nums; }
 .history-volume>strong { display: block; font-weight: 500; }
 .history-volume>span { display: block; color: var(--muted-foreground); font-size: .75rem; }

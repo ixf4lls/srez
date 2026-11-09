@@ -70,6 +70,15 @@
   --text-destructive: #e7000b;               /* figma: text-destructive       */
   --destructive-subtle: #e7000b1a;           /* figma: destructive-subtle 10% */
 
+  --status-success: #057402;
+  --status-success-subtle: #e3fee3;
+  --status-warning: #854d0e;
+  --status-warning-subtle: #fef9c3;
+  --status-danger: #b91c1c;
+  --status-danger-subtle: #fee2e2;
+  --status-neutral: #525252;
+  --status-neutral-subtle: var(--secondary);
+
   /* Lines & focus */
   --border: #e5e5e5;                         /* figma: sidebar-border neutral-200 */
   --input: #e5e5e5;                          /* figma: input        neutral-200 */
@@ -137,6 +146,15 @@
   --destructive-foreground: #fafafa;
   --text-destructive: #ff6467;
   --destructive-subtle: #ff64671f;
+
+  --status-success: #a3fda1;
+  --status-success-subtle: #052e16;
+  --status-warning: #fde047;
+  --status-warning-subtle: #422006;
+  --status-danger: #fca5a5;
+  --status-danger-subtle: #450a0a;
+  --status-neutral: #d4d4d4;
+  --status-neutral-subtle: var(--secondary);
 
   --border: #ffffff1a;
   --input: #ffffff26;
