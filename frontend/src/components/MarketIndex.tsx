@@ -14,16 +14,16 @@ export function MarketIndexCard({vacancies}:{vacancies:Vacancy[]}) {
       <h2>Индекс рынка</h2>
       <Tooltip><TooltipTrigger asChild><IconButton variant="ghost" size="xs" className="market-index-help" aria-label="Как рассчитывается индекс рынка"><CircleHelp aria-hidden="true" /></IconButton></TooltipTrigger>
         <TooltipContent className="max-w-[min(24rem,90vw)] leading-relaxed" side="top" collisionPadding={12}>
-          <div className="market-index-formula" role="math" aria-label="Индекс рынка равен сумме откликов на выбранные вакансии, делённой на количество вакансий в выборке">
+          <div className="market-index-formula" role="math" aria-label="Индекс рынка равен среднему количеству откликов на выбранные вакансии, делённому на количество вакансий в выборке">
             <span aria-hidden="true">Индекс рынка =</span>
-            <span className="market-index-fraction" aria-hidden="true"><span>Сумма откликов</span><span>Количество вакансий в выборке</span></span>
+            <span className="market-index-fraction" aria-hidden="true"><span>Среднее количество откликов</span><span>Количество вакансий в выборке</span></span>
           </div>
         </TooltipContent>
       </Tooltip>
     </div>
     <div className="market-index-content">
-      <dl><dt className="sr-only">Индекс рынка</dt><dd className="text-2xl font-semibold tabular-nums" data-testid="market-index-mean">{value(index.responsesPerVacancy)}</dd></dl>
-      {index.responsesPerVacancy===null&&<div className="market-index-notes text-xs leading-relaxed text-muted-foreground">
+      <dl><dt className="sr-only">Индекс рынка</dt><dd className="text-2xl font-semibold tabular-nums" data-testid="market-index-mean">{value(index.value)}</dd></dl>
+      {index.value===null&&<div className="market-index-notes text-xs leading-relaxed text-muted-foreground">
         <p>{!index.vacancyCount?'В выборке нет загруженных вакансий.':'У вакансий выборки нет данных об откликах.'}</p>
       </div>}
     </div>
