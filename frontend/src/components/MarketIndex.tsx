@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { analysisSnapshotAt, marketIndex } from '../marketIndex';
 import type { Analysis, Vacancy } from '../types';
 
-const indexNumber=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:4});
+const indexNumber=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 export function MarketIndexCard({analysis,vacancies}:{analysis:Analysis;vacancies:Vacancy[]}) {
   const index=marketIndex(vacancies,analysisSnapshotAt(analysis));
