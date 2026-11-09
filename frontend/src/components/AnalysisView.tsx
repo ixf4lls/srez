@@ -25,6 +25,10 @@ import { Companies } from './Companies';
 
 type RatesResponse = { rates: SalaryRates; date: string; source: string; sourceUrl: string; stale: boolean };
 const sidebarDimensions = (['grade', 'experience', 'format'] as const).map(key => dimensions.find(dimension => dimension.key === key)!);
+const sidebarCategoryOrder: Partial<Record<Dimension, readonly string[]>> = {
+  grade: ['Junior', 'Middle', 'Senior', 'Lead', 'Не указан'],
+  experience: ['Нет опыта', 'От 1 года до 3 лет', 'От 3 до 6 лет', 'Более 6 лет', 'Не указан'],
+};
 
 export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string; navigate: (s: string) => void; onRepeat: (a: Analysis) => void; onChanged: () => void }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -108,7 +112,15 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   const canResume = !active && (['cancelled', 'attention', 'interrupted'].includes(a.status) || (a.status === 'partial' && (a.failed > 0 || (a.found > a.collected && a.nextPage < 40))));
   const breakdowns = (report: Report, mode: 'filters' | 'summary') => {
     const canFilter = mode === 'filters';
-    return <div className="breakdown-stack">{(canFilter ? dimensions : sidebarDimensions).map(({ key, title }) => <Breakdown key={key} title={title} dimension={key} metrics={report.dimensions[key] || []} selected={canFilter ? filters[key] || [] : []} onToggle={canFilter ? value => toggleFilter(key, value) : undefined} onSources={() => { setShowFilters(false); setExploration({ title, dimension: key === 'format' ? 'workFormats' : key, metrics: report.dimensions[key] || [], filterDimension: canFilter ? key : undefined }); }} />)}</div>;
+    return <div className="breakdown-stack">{(canFilter ? dimensions : sidebarDimensions).map(({ key, title }) => {
+      let metrics = report.dimensions[key] || [];
+      const order = !canFilter ? sidebarCategoryOrder[key] : undefined;
+      if (order) {
+        const rank = (label: string) => { const index = order.indexOf(label); return index < 0 ? order.length : index; };
+        metrics = [...metrics].sort((a, b) => rank(a.label) - rank(b.label));
+      }
+      return <Breakdown key={key} title={title} dimension={key} metrics={metrics} selected={canFilter ? filters[key] || [] : []} onToggle={canFilter ? value => toggleFilter(key, value) : undefined} onSources={() => { setShowFilters(false); setExploration({ title, dimension: key === 'format' ? 'workFormats' : key, metrics, filterDimension: canFilter ? key : undefined }); }} />;
+    })}</div>;
   };
 
   return <>
