@@ -63,7 +63,7 @@ export default function App() {
     <header className="app-header">{!hero && <a className="wordmark" href="/" onClick={newAnalysis} aria-label="srez. На главную">srez<span>.</span></a>}<nav aria-label="Основная навигация">
       {!hero && <Button asChild><a href="/" onClick={newAnalysis}><Plus data-icon="inline-start" aria-hidden="true" />Новый анализ</a></Button>}
       <Button asChild variant="ghost" className="history-nav"><a href="/history" onClick={historyLink} aria-current={path === '/history' ? 'page' : undefined}><History data-icon="inline-start" aria-hidden="true" />История</a></Button>
-      <IconButton variant="ghost" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} title={dark ? 'Светлая тема' : 'Тёмная тема'} onClick={() => setDark(!dark)}>{dark ? <Sun /> : <Moon />}</IconButton>
+      <IconButton variant="ghost" className="theme-toggle" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} title={dark ? 'Светлая тема' : 'Тёмная тема'} onClick={() => setDark(!dark)}>{dark ? <Sun /> : <Moon />}</IconButton>
     </nav></header>
     <main id="main-content" className={hero ? 'hero-main' : 'content-page'} tabIndex={-1}>
       {id ? <Suspense fallback={<LoadingState text="Загружаем отчёт" />}><AnalysisView key={id} id={id} navigate={navigate} onChanged={() => void refresh()} onRepeat={a => { setRepeat(a); setFormKey(k => k + 1); navigate('/'); }} /></Suspense>
