@@ -24,7 +24,6 @@ export function HistoryView({ analyses, loading, error, navigate, refresh, onNew
   const [actionError, setActionError] = useState('');
   const [undo, setUndo] = useState<Analysis | null>(null);
   const filtered = useMemo(() => sortHistory(analyses.filter(a => `${a.title} ${a.expression}`.toLowerCase().includes(query.toLowerCase()) && (status === 'all' || historyStatusGroup(a.status) === status)), sort), [analyses, query, status, sort]);
-  const toolbarSort = sort.key === 'updatedAt' ? sort.direction === 'desc' ? 'newest' : 'oldest' : sort.key === 'processed' && sort.direction === 'desc' ? 'size' : 'column';
   function sortBy(column: HistorySortKey) { setSort(previous => nextHistorySort(previous, column)); }
   async function restore() {
     if (!undo) return;
@@ -39,7 +38,6 @@ export function HistoryView({ analyses, loading, error, navigate, refresh, onNew
     <div className="history-toolbar">
       <label className="form-field history-search"><span>Поиск по истории</span><div className="input-with-icon"><Search size={15} aria-hidden="true" /><Input placeholder="Найти анализ…" value={query} onChange={e => setQuery(e.target.value)} /></div></label>
       <label className="toolbar-select"><span>Статус</span><NativeSelect value={status} onChange={e => setStatus(e.target.value)}><option value="all">Все статусы</option>{Object.entries(historyStatusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</NativeSelect></label>
-      <label className="toolbar-select"><span>Порядок</span><NativeSelect value={toolbarSort} onChange={e => setSort(e.target.value === 'size' ? { key: 'processed', direction: 'desc' } : { key: 'updatedAt', direction: e.target.value === 'oldest' ? 'asc' : 'desc' })}>{toolbarSort === 'column' && <option value="column" disabled>{historySortLabels[sort.key]} {sort.direction === 'asc' ? '↑' : '↓'}</option>}<option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option><option value="size">Больше вакансий</option></NativeSelect></label>
     </div>
     {loading ? <LoadingState text="Загружаем историю анализов" /> : filtered.length ? <div className="history-table-wrap"><div className="history-mobile-sort" role="group" aria-label="Сортировка истории">{sortColumns.map(column => <HistorySortButton key={column} column={column} sort={sort} onSort={sortBy} compact />)}</div><table className="history-table"><thead><tr><th scope="col" className="history-status">Статус</th><th scope="col">Анализ</th>{sortColumns.map(column => <th key={column} scope="col" className={`history-sort-header ${column === 'updatedAt' ? 'history-date' : 'numeric'}`} aria-sort={sort.key === column ? sort.direction === 'asc' ? 'ascending' : 'descending' : undefined}><HistorySortButton column={column} sort={sort} onSort={sortBy} /></th>)}<th scope="col"><span className="sr-only">Действия</span></th></tr></thead><tbody>{filtered.map(a => <tr key={a.id}>
       <td className="history-status" data-status={historyStatusGroup(a.status)}><StatusBadge status={historyStatusGroup(a.status)} /></td>
