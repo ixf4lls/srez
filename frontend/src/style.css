@@ -253,7 +253,7 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
 .inline-link { text-align: start; text-decoration: underline; text-underline-offset: 3px; }
 .inline-link:hover { color: var(--chart-5); }
 .company-link { min-height: 2.75rem; overflow-wrap: anywhere; }
-.companies-table { table-layout: fixed; }
+.data-table.companies-table { min-width: 0; table-layout: fixed; }
 .companies-table th:first-child { width: 50%; }
 .companies-table th, .companies-table td { padding: .75rem; }
 .collection-card { max-width: 46rem; margin: 2rem auto; }
