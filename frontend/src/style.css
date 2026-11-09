@@ -25,7 +25,7 @@
 .app-header { width: 100%; max-width: var(--page-width); height: 5.5rem; padding: 0 var(--page-gutter); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
 .hero-shell .app-header { justify-content: flex-end; }
 .wordmark { font-size: 1.875rem; line-height: 2.25rem; font-weight: 600; }
-.wordmark span { color: var(--chart-4); }
+.wordmark span { display: inline-block; width: .14em; height: .14em; margin-inline-start: .055em; overflow: hidden; border-radius: 50%; background: var(--chart-4); color: transparent; }
 .app-header nav { display: flex; align-items: center; gap: .5rem; }
 .history-nav { background: var(--background); }
 .history-nav:hover, .history-nav:focus-visible { background: color-mix(in srgb, var(--foreground) 8%, var(--background)); }
