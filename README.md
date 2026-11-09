@@ -83,6 +83,11 @@ docker compose up -d --force-recreate runner
 | `api/` | Go API, фоновые задачи, правила аналитики, работа с PostgreSQL 17 |
 | `runner/` | Node.js runtime api-anything и операции hh.ru |
 
+Для проверки интерфейса без Docker и БД запустите `(cd frontend && npm run dev:mock)`
+и откройте [localhost:5173](http://localhost:5173). Изменения применяются через HMR.
+Режим использует вымышленные тестовые данные и хранит изменения в памяти Vite.
+Сценарии и сброс данных описаны в [frontend/mocks/README.md](frontend/mocks/README.md).
+
 Для локальных проверок нужны Go 1.26 и Node.js 24. Команды выполняются из корня проекта:
 
 ```sh

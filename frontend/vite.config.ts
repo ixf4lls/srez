@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
+import { mockApiPlugin } from './mocks/plugin';
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), tailwindcss(), ...(mode === 'mock' ? [mockApiPlugin()] : [])],
   resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
-  server: { proxy: { '/api': 'http://127.0.0.1:3000' } },
-});
+  server: mode === 'mock' ? {} : { proxy: { '/api': 'http://127.0.0.1:3000' } },
+}));
