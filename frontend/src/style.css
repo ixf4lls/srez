@@ -122,14 +122,11 @@
 .report-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; flex-shrink: 0; }
 .report-query { margin-bottom: 1.75rem; }
 .report-query summary, .salary-method summary { display: flex; align-items: center; width: fit-content; gap: .5rem; color: var(--muted-foreground); font-size: .75rem; list-style: none; }
-.report-query[open] summary>svg, .salary-method[open] summary>svg, .coverage-notice[open] summary>svg { transform: rotate(180deg); }
+.report-query[open] summary>svg, .salary-method[open] summary>svg { transform: rotate(180deg); }
 .report-query>div { margin-top: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--sidebar); }
 .report-query code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
 .query-conditions { display: flex; flex-wrap: wrap; gap: .375rem; margin-top: .75rem; }
 .query-conditions:empty { display: none; }
-.coverage-notice { padding: .875rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 1rem; color: var(--muted-foreground); font-size: .75rem; }
-.coverage-notice summary { display: flex; align-items: center; gap: .5rem; list-style: none; color: var(--foreground); }
-.coverage-notice ul { padding-inline-start: 1rem; margin-top: .75rem; list-style: disc; line-height: 1.5rem; }
 .report-filterbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 1rem 1.5rem; margin-bottom: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--background); }
 .sample-count { display: flex; align-items: baseline; gap: .5rem; flex-shrink: 0; }
 .sample-count>strong { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
