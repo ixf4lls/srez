@@ -1,45 +1,54 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {filterVacancies} from './analytics.ts';
-import {analysisSnapshotAt,marketIndex} from './marketIndex.ts';
+import {marketIndex} from './marketIndex.ts';
 import type {Vacancy} from './types.ts';
 
 const vacancy=(id:string,values:Partial<Vacancy>={}):Vacancy=>({id,url:`https://hh.ru/vacancy/${id}`,title:`Job ${id}`,company:'Example',salary:'',city:'Москва',address:'Москва',experience:'1–3 года',workFormats:[],format:'Офис',grade:'Middle',employment:'',workSchedule:'',workingHours:'',description:'',keySkills:[],responseCount:null,publishedAt:'',collectedAt:'2026-11-01T09:00:00Z',loaded:true,requirements:[],...values});
 
-test('market index keeps the mean/count and sum/count variants distinct',()=>{
- const index=marketIndex([vacancy('1',{publishedAt:'2026-11-01T09:00:00Z',responseCount:10}),vacancy('2',{publishedAt:'2026-11-08T09:00:00Z',responseCount:30})],'2026-11-09T09:00:00Z');
+test('market index divides the sum of selected responses by the selected vacancy count once',()=>{
+ const index=marketIndex([vacancy('1',{responseCount:10}),vacancy('2',{responseCount:30})]);
  assert.equal(index.vacancyCount,2);assert.equal(index.responseCoverage,2);
- assert.equal(index.responseTotal,40);assert.equal(index.responseMean,20);
- assert.equal(index.meanPerVacancy,10);assert.equal(index.totalPerVacancy,20);
+ assert.equal(index.responseTotal,40);assert.equal(index.responsesPerVacancy,20);
 });
-test('market index uses the fixed publication window including its exact boundaries',()=>{
- const dates=['2026-10-10T08:59:59.999Z','2026-10-10T09:00:00Z','2026-11-09T12:00:00+0300','2026-11-09T09:00:00.001Z','2026-02-30T09:00:00Z','not-a-date','', '2026-11-01T25:00:00Z'];
- const vs=dates.map((publishedAt,i)=>vacancy(String(i),{publishedAt,responseCount:10}));
- vs.push(vacancy('unloaded',{publishedAt:'2026-11-01T09:00:00Z',responseCount:10,loaded:false}));
- const index=marketIndex(vs,'2026-11-09T09:00:00Z');
- assert.equal(index.periodStart,'2026-10-10T09:00:00.000Z');assert.equal(index.periodEnd,'2026-11-09T09:00:00.000Z');
- assert.equal(index.vacancyCount,2);assert.equal(index.responseTotal,20);
+
+test('changing filters recomputes the response sum even when the vacancy count stays the same',()=>{
+ const vs=[vacancy('1',{responseCount:10}),vacancy('2',{responseCount:30}),vacancy('3',{city:'Казань',responseCount:100}),vacancy('4',{city:'Казань',responseCount:200})];
+ const moscow=marketIndex(filterVacancies(vs,{city:['Москва']}));
+ const kazan=marketIndex(filterVacancies(vs,{city:['Казань']}));
+ assert.equal(moscow.vacancyCount,2);assert.equal(kazan.vacancyCount,2);
+ assert.equal(moscow.responseTotal,40);assert.equal(moscow.responsesPerVacancy,20);
+ assert.equal(kazan.responseTotal,300);assert.equal(kazan.responsesPerVacancy,150);
+ const combined=marketIndex(filterVacancies(vs,{city:['Москва','Казань']}));
+ assert.equal(combined.responseTotal,340);assert.equal(combined.responsesPerVacancy,85);
 });
-test('market index excludes unknown and invalid responses from the mean but retains all period vacancies',()=>{
- const vs=[10,0,null,-1,NaN,Infinity].map((responseCount,i)=>vacancy(String(i),{publishedAt:'2026-11-01',responseCount}));
- const index=marketIndex(vs,'2026-11-09T09:00:00Z');
- assert.equal(index.vacancyCount,6);assert.equal(index.responseCoverage,2);
- assert.equal(index.responseMean,5);assert.equal(index.meanPerVacancy,5/6);assert.equal(index.totalPerVacancy,10/6);
- const zero=marketIndex([vacancy('zero',{publishedAt:'2026-11-01',responseCount:0})],'2026-11-09T09:00:00Z');
- assert.equal(zero.meanPerVacancy,0);assert.equal(zero.totalPerVacancy,0);
+
+test('the whole loaded selection is counted regardless of publication date',()=>{
+ const dates=['2025-01-01','2026-11-09','', 'not-a-date', '2030-01-01'];
+ const vs=dates.map((publishedAt,index)=>vacancy(String(index),{publishedAt,responseCount:10}));
+ vs.push(vacancy('unloaded',{responseCount:999,loaded:false}));
+ const index=marketIndex(vs);
+ assert.equal(index.vacancyCount,5);assert.equal(index.responseTotal,50);assert.equal(index.responsesPerVacancy,10);
 });
-test('market index has no value for an empty period, unknown responses or invalid snapshot',()=>{
- for(const vs of [[],[vacancy('unknown',{publishedAt:'2026-11-01'})],[vacancy('old',{publishedAt:'2025-11-01',responseCount:10})]]){
-  const index=marketIndex(vs,'2026-11-09T09:00:00Z');assert.equal(index.meanPerVacancy,null);assert.equal(index.totalPerVacancy,null);
+
+test('unknown and invalid responses do not enter the sum, while their loaded vacancies stay in the denominator',()=>{
+ const vs=[10,0,null,-1,NaN,Infinity,1.5].map((responseCount,index)=>vacancy(String(index),{responseCount}));
+ const index=marketIndex(vs);
+ assert.equal(index.vacancyCount,7);assert.equal(index.responseCoverage,2);
+ assert.equal(index.responseTotal,10);assert.equal(index.responsesPerVacancy,10/7);
+ const zero=marketIndex([vacancy('zero',{responseCount:0})]);
+ assert.equal(zero.responseTotal,0);assert.equal(zero.responsesPerVacancy,0);
+});
+
+test('empty selections and selections without known responses have no numeric index',()=>{
+ for(const vs of [[],[vacancy('unknown')],[vacancy('unloaded',{responseCount:10,loaded:false})]]){
+  const index=marketIndex(vs);assert.equal(index.responseTotal,null);assert.equal(index.responsesPerVacancy,null);
  }
- assert.equal(marketIndex([vacancy('1')],'invalid').periodEnd,null);
 });
-test('market index filters the cohort while keeping the saved analysis snapshot fixed',()=>{
- const snapshot=analysisSnapshotAt({completedAt:'2026-11-09T09:00:00Z',updatedAt:'2026-12-09T09:00:00Z'});
- assert.equal(snapshot,'2026-11-09T09:00:00Z');
- assert.equal(analysisSnapshotAt({updatedAt:'2026-11-09T09:00:00Z'}),snapshot);
- assert.equal(analysisSnapshotAt({completedAt:'invalid',updatedAt:snapshot}),snapshot);
- const vs=[vacancy('1',{publishedAt:'2026-11-01',responseCount:10}),vacancy('2',{publishedAt:'2026-11-01',city:'Казань',responseCount:30})];
- const index=marketIndex(filterVacancies(vs,{city:['Казань']}),snapshot);
- assert.equal(index.vacancyCount,1);assert.equal(index.meanPerVacancy,30);assert.equal(index.totalPerVacancy,30);assert.equal(index.periodEnd,'2026-11-09T09:00:00.000Z');
+
+test('combined category and company filters use only matching vacancies for both numerator and denominator',()=>{
+ const vs=[vacancy('1',{company:'A',responseCount:10}),vacancy('2',{company:'B',responseCount:30}),vacancy('3',{company:'A',city:'Казань',responseCount:100})];
+ const index=marketIndex(filterVacancies(vs,{city:['Москва'],company:['A']}));
+ assert.equal(index.vacancyCount,1);assert.equal(index.responseTotal,10);assert.equal(index.responsesPerVacancy,10);
+ assert.equal(marketIndex(filterVacancies(vs,{city:['Нет такого города']})).responsesPerVacancy,null);
 });
