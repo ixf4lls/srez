@@ -125,8 +125,8 @@
 .report-query[open] summary>svg, .salary-method[open] summary>svg { transform: rotate(180deg); }
 .query-parameters { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: .75rem; overflow: hidden; }
 .query-parameter { position: relative; min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--foreground); font-size: .75rem; line-height: 1.25rem; }
-.query-parameter::before { content: ''; position: absolute; inset-inline-start: -.75rem; top: .25rem; width: 1px; height: .75rem; background: var(--border); }
-.report-query code { white-space: pre-wrap; font-family: inherit; }
+.query-parameter::before { content: ''; position: absolute; inset-inline-start: -.75rem; top: .25rem; width: 1px; height: .75rem; background: var(--muted-foreground); }
+.report-query code { white-space: pre-wrap; word-break: break-all; font-family: inherit; }
 .report-filterbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .75rem; min-height: 4.5rem; padding: 1rem 1.5rem; margin-bottom: 1.25rem; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--background); }
 .sample-count { display: flex; align-items: baseline; gap: .5rem; flex-shrink: 0; }
 .sample-count>strong { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
