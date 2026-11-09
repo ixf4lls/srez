@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api, date, isActive, number } from '../types';
+import { relativeDate } from '../dates';
 import type { Analysis, Metric, Report, Vacancy } from '../types';
 import { deriveReport, dimensions, filterVacancies, readViewFilters, salaryGroups } from '../analytics';
 import type { Dimension, SalaryRates, ViewFilters } from '../analytics';
@@ -107,7 +108,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
 
   return <>
     <Button variant="ghost" size="sm" className="back-to-history" onClick={() => navigate('/history')}><ArrowLeft data-icon="inline-start" />История анализов</Button>
-    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date">{date(a.createdAt)} МСК<span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" onClick={() => onRepeat(a)}><RefreshCw data-icon="inline-start" />Повторить поиск</Button>{canResume && <Button disabled={actionLoading} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}</div></section>
+    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date"><time dateTime={a.createdAt} title={`${date(a.createdAt)} МСК`}>{relativeDate(a.createdAt)}</time><span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" onClick={() => onRepeat(a)}><RefreshCw data-icon="inline-start" />Повторить поиск</Button>{canResume && <Button disabled={actionLoading} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}</div></section>
     <details className="report-query"><summary>Параметры запроса<ChevronDown size={14} aria-hidden="true" /></summary><div><code>{a.expression}</code><div className="query-conditions">{Object.entries(a.filters).filter(([, value]) => value).map(([key, value]) => <Badge variant="outline" key={key}>{a.filterLabels?.[key] || value}</Badge>)}</div></div></details>
     {error && <ErrorNotice retry={() => void refresh()}>{error}</ErrorNotice>}
     {!active && a.error && <div className="data-notice"><strong>{a.message}</strong><p>{a.error.replace(/^\w+:\s*/, '')}</p>{/auth|blocked/.test(a.error) && <p>Обновите сессию hh.ru через <code>api-anything login hh --window</code>, затем продолжите сбор.</p>}</div>}
