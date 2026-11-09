@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { statusLabel } from '../types';
 
-export function StatusBadge({ status, label }: { status: string; label?: string }) {
-  const fullLabel = statusLabel[status] || status;
+export function StatusBadge({ status }: { status: string }) {
   const Icon = status === 'completed' ? Check : ['queued', 'running'].includes(status) ? LoaderCircle : ['attention', 'interrupted', 'partial'].includes(status) ? AlertCircle : Pause;
-  return <Badge variant={status === 'attention' ? 'destructive' : 'secondary'} className={['queued', 'running'].includes(status) ? 'active-status' : ''} title={label && label !== fullLabel ? fullLabel : undefined}><Icon data-icon="inline-start" className={status === 'running' ? 'spin' : ''} />{label || fullLabel}</Badge>;
+  return <Badge variant={status === 'attention' ? 'destructive' : 'secondary'} className={['queued', 'running'].includes(status) ? 'active-status' : ''}><Icon data-icon="inline-start" className={status === 'running' ? 'spin' : ''} />{statusLabel[status] || status}</Badge>;
 }
 
 export function PageHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
