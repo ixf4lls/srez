@@ -12,7 +12,7 @@ export type Analysis = {id:string;title:string;query:string;excludeWords?:string
 export type Proposal = {expression:string;explanations:string[];technologies:string[]};
 export const isActive = (a:Analysis) => ['queued','running'].includes(a.status);
 export const number = (n:number) => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(n);
-export const date = (s:string) => new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Moscow'}).format(new Date(s));
+export {date} from './dates';
 export const statusLabel:Record<string,string> = {completed:'Готов',partial:'Частичные данные',running:'Выполняется',queued:'В очереди',attention:'Требует внимания',cancelled:'Остановлен',interrupted:'Прерван'};
 export async function api<T>(path:string,body?:unknown):Promise<T> {
   const res=await fetch(`/api${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
