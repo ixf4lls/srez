@@ -106,7 +106,7 @@
 .analysis-name-cell>a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .analysis-name-cell>span { display: block; margin-top: .375rem; color: var(--muted-foreground); font-size: .75rem; line-height: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .history-date { color: var(--muted-foreground); white-space: nowrap; }
-.history-table .history-status { width: 1%; padding-inline: .75rem; white-space: nowrap; }
+.history-table .history-status { width: 1%; padding-inline: .5rem; white-space: nowrap; }
 .numeric { text-align: end!important; font-variant-numeric: tabular-nums; }
 .history-volume>strong { display: block; font-weight: 500; }
 .history-volume>span { display: block; color: var(--muted-foreground); font-size: .75rem; }
