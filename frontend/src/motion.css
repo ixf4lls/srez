@@ -1,0 +1,86 @@
+@import 'animate.css/source/fading_entrances/fadeIn.css';
+/*! Animate.css 4.1.1, Copyright (c) 2020 Daniel Eden. MIT license: /licenses/animate.css.txt */
+
+:root {
+  --motion-feedback: 120ms;
+  --motion-enter: 200ms;
+  --motion-ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-content,
+  .page-heading,
+  .report-heading,
+  .history-table-wrap,
+  .collection-card,
+  .empty-state {
+    animation: fadeIn var(--motion-enter) var(--motion-ease);
+  }
+
+  .report-tabs > [data-slot='tabs-content'][data-state='active'],
+  .report-query[open] > .query-parameters,
+  .salary-method[open] > div,
+  .error-notice,
+  .undo-toast {
+    animation: fadeIn 160ms var(--motion-ease);
+  }
+
+  [data-slot='button'],
+  [data-slot='icon-button'],
+  [data-slot='tabs-trigger'],
+  .filter-chip {
+    transition-property: background-color, border-color, color, box-shadow, scale, translate;
+    transition-duration: var(--motion-feedback);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  [data-slot='button']:not(.history-sort-button):active:not(:disabled, [aria-disabled='true']),
+  .filter-chip:active:not(:disabled) {
+    scale: .98;
+  }
+
+  [data-slot='icon-button']:active:not(:disabled, [aria-disabled='true']) {
+    scale: .94;
+  }
+
+  .hero-submit:active:not(:disabled) {
+    translate: 0 0;
+  }
+
+  .hero-search-row,
+  .history-table tbody tr,
+  .metric-table-row {
+    transition: background-color var(--motion-feedback) var(--motion-ease),
+      border-color var(--motion-feedback) var(--motion-ease),
+      box-shadow var(--motion-feedback) var(--motion-ease);
+  }
+
+  .report-query summary > svg,
+  .salary-method summary > svg {
+    transition: transform 160ms var(--motion-ease);
+  }
+
+  [data-slot='popover-content'],
+  [data-slot='dialog-content'],
+  [data-slot='dialog-overlay'],
+  [data-slot='sheet-overlay'] {
+    animation-duration: 180ms;
+    animation-timing-function: var(--motion-ease);
+  }
+
+  [data-slot='sheet-content'] {
+    animation-duration: 240ms;
+    animation-timing-function: var(--motion-ease);
+  }
+
+  :is([data-slot='popover-content'], [data-slot='dialog-content'], [data-slot='dialog-overlay'],
+      [data-slot='sheet-content'], [data-slot='sheet-overlay'])[data-state='closed'] {
+    animation-duration: var(--motion-feedback);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .hero-submit:hover:not(:disabled):not(:active) {
+    translate: 0 -1px;
+  }
+}

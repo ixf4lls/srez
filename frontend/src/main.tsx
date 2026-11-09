@@ -4,4 +4,5 @@ import App from './App';
 import '@fontsource-variable/inter';
 import './style.css';
 import './kit.css';
+import './motion.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
