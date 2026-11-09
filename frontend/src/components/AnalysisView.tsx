@@ -38,6 +38,8 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   const [vacancyError, setVacancyError] = useState('');
   const [exploration, setExploration] = useState<Exploration | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refreshingSearch, setRefreshingSearch] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<ViewFilters>(readViewFilters);
   const [rates, setRates] = useState<RatesResponse | null>(null);
@@ -107,6 +109,19 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
     catch (e) { setError((e as Error).message); }
     finally { setActionLoading(false); }
   }
+  async function refreshSearch() {
+    if (!analysis || refreshingSearch || actionLoading) return;
+    setRefreshingSearch(true); setSearchError('');
+    try {
+      const next = await api<Analysis>('/analyses', {
+        query: analysis.query, title: analysis.title, expression: analysis.expression,
+        mode: analysis.mode, excludeWords: analysis.excludeWords,
+        filters: analysis.filters, filterLabels: analysis.filterLabels, confirmed: true,
+      });
+      onChanged(); navigate(`/analyses/${next.id}`);
+    } catch (e) { setSearchError((e as Error).message); }
+    finally { setRefreshingSearch(false); }
+  }
   if (!analysis) return error ? <ErrorNotice retry={() => void refresh()}>{error}</ErrorNotice> : <LoadingState text="Загружаем анализ" />;
   const a = analysis;
   const canResume = !active && (['cancelled', 'attention', 'interrupted'].includes(a.status) || (a.status === 'partial' && (a.failed > 0 || (a.found > a.collected && a.nextPage < 40))));
@@ -125,11 +140,12 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
 
   return <>
     <Button variant="ghost" size="sm" className="back-to-history" onClick={() => navigate('/history')}><ArrowLeft data-icon="inline-start" />История анализов</Button>
-    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date"><time dateTime={a.createdAt} title={`${date(a.createdAt)} МСК`}>{relativeDate(a.createdAt)}</time><span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" onClick={() => onRepeat(a)}><RefreshCw data-icon="inline-start" />Повторить поиск</Button>{canResume && <Button disabled={actionLoading} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}</div></section>
+    <section className="report-heading"><div className="report-heading-main"><div className="report-title-line"><h1>{a.title}</h1><StatusBadge status={a.status} /></div><p className="report-date"><time dateTime={a.createdAt} title={`${date(a.createdAt)} МСК`}>{relativeDate(a.createdAt)}</time><span>·</span>{a.mode === 'roles' ? 'В названии вакансии' : 'Во всём тексте'}</p></div><div className="report-actions"><Button variant="outline" disabled={refreshingSearch || actionLoading} aria-busy={refreshingSearch} onClick={() => void refreshSearch()}>{refreshingSearch ? <LoaderCircle className="spin" data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{refreshingSearch ? 'Запускаем…' : 'Обновить данные'}</Button>{canResume && <Button disabled={actionLoading || refreshingSearch} onClick={() => void action('resume')}>{actionLoading ? <LoaderCircle className="spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}Продолжить сбор</Button>}</div></section>
     <details className="report-query"><summary>Параметры запроса<ChevronDown size={14} aria-hidden="true" /></summary><div><code>{a.expression}</code><div className="query-conditions">{Object.entries(a.filters).filter(([, value]) => value).map(([key, value]) => <Badge variant="outline" key={key}>{a.filterLabels?.[key] || value}</Badge>)}</div></div></details>
     {error && <ErrorNotice retry={() => void refresh()}>{error}</ErrorNotice>}
+    {searchError && <ErrorNotice retry={() => void refreshSearch()}>{searchError}</ErrorNotice>}
     {!active && a.error && <div className="data-notice"><strong>{a.message}</strong><p>{a.error.replace(/^\w+:\s*/, '')}</p>{/auth|blocked/.test(a.error) && <p>Обновите сессию hh.ru через <code>api-anything login hh --window</code>, затем продолжите сбор.</p>}</div>}
-    {active ? <CollectionProgress analysis={a} onCancel={() => void action('cancel')} busy={actionLoading} /> : <>
+    {active ? <CollectionProgress analysis={a} onCancel={() => void action('cancel')} busy={actionLoading || refreshingSearch} /> : <>
       {vacancyError ? <ErrorNotice retry={() => void loadVacancies()}>{vacancyError}</ErrorNotice> : !vacanciesLoaded ? <LoadingState text="Загружаем сохранённые вакансии" /> : null}
       {vacanciesLoaded && !r && <EmptyState title="Отчёт пока не сформирован" description="Продолжите сбор, чтобы получить данные для анализа." />}
       {r && <>

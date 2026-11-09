@@ -69,6 +69,35 @@ test('create, progress, cancel, resume and refresh retain isolated mutable state
   assert.equal(analysis.status, 'queued');
 });
 
+test('restarting a saved search keeps its parameters and creates a separate collection', () => {
+  for (const mode of ['roles', 'stack']) {
+    let time = initialTime;
+    const api = createMockApi(() => time);
+    const saved = api.handle('POST', '/api/analyses', {
+      ...post, mode, title: '[Тест] Сохранённый поиск',
+      expression: '(React OR TypeScript) AND NOT NAME:стажёр', excludeWords: 'стажёр',
+      filters: { area: '1', work_format: 'REMOTE', employment_form: 'LABOUR' },
+      filterLabels: { area: 'Москва', work_format: 'Удалённо', employment_form: 'ТК РФ' },
+    }).body as Analysis;
+    time += 13_000;
+    const source = api.handle('GET', `/api/analyses/${saved.id}`).body as Analysis;
+    const { query, title, expression, excludeWords, filters, filterLabels } = source;
+    const restarted = api.handle('POST', '/api/analyses', {
+      query, title, expression, mode, excludeWords, filters, filterLabels, confirmed: true,
+    }).body as Analysis;
+    assert.notEqual(restarted.id, source.id);
+    for (const key of ['query', 'title', 'expression', 'mode', 'excludeWords', 'filters', 'filterLabels'] as const) {
+      assert.deepEqual(restarted[key], source[key], key);
+    }
+    assert.equal(restarted.status, 'queued');
+    assert.equal(restarted.collected, 0);
+    assert.equal(restarted.processed, 0);
+    assert.equal(restarted.report, undefined);
+    assert.notEqual(restarted.createdAt, source.createdAt);
+    assert.deepEqual(api.handle('GET', `/api/analyses/${source.id}`).body, source);
+  }
+});
+
 test('soft deletion hides analysis and vacancies, restore preserves the snapshot', () => {
   const api = createMockApi(() => initialTime);
   const path = `/api/analyses/${completedId}`;

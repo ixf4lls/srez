@@ -3,7 +3,7 @@ import { filterGroups, makeEntries, makeEntry, makeReport } from './fixtures.ts'
 import type { MockEntry } from './fixtures.ts';
 
 type Reply = { status: number; body: unknown };
-type Input = { query?: string; title?: string; mode?: string; expression?: string; confirmed?: boolean; filters?: Filters; filterLabels?: Filters; scenario?: string };
+type Input = { query?: string; title?: string; mode?: string; excludeWords?: string; expression?: string; confirmed?: boolean; filters?: Filters; filterLabels?: Filters; scenario?: string };
 const reply = (status: number, body: unknown): Reply => ({ status, body: structuredClone(body) });
 const failure = (status: number, error: string) => reply(status, { error });
 
@@ -65,7 +65,8 @@ export function createMockApi(now = () => Date.now()) {
         if (typeof filters !== 'object' || Array.isArray(filters) || Object.entries(filters).some(([key, value]) => !filterGroups.some(group => group.key === key) || typeof value !== 'string')) return failure(400, 'Недопустимый фильтр');
         const id = crypto.randomUUID().replaceAll('-', '').slice(0, 24);
         const entry = makeEntry(id, now(), query);
-        Object.assign(entry.analysis, { title: `[Тест] ${input.title?.trim() || query}`, mode: input.mode, expression: input.expression, filters, filterLabels: input.filterLabels ?? {} } satisfies Partial<Analysis>);
+        const title = input.title?.trim() || query;
+        Object.assign(entry.analysis, { title: title.startsWith('[Тест] ') ? title : `[Тест] ${title}`, mode: input.mode, excludeWords: input.excludeWords, expression: input.expression, filters, filterLabels: input.filterLabels ?? {} } satisfies Partial<Analysis>);
         start(entry); entries.set(id, entry);
         return reply(201, entry.analysis);
       }
