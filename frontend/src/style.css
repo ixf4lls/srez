@@ -184,7 +184,7 @@
 .breakdown-values>span { color: var(--muted-foreground); }
 .breakdown-values>strong { font-weight: 500; min-width: 2.75rem; text-align: end; }
 .breakdown-track { grid-column: 1/-1; background: var(--muted); height: .25rem; border-radius: var(--radius-full); overflow: hidden; }
-:root:not(.dark) .breakdown-track { background: var(--secondary); }
+:root:not(.dark) .breakdown-track, :root:not(.dark) .metric-table-row .metric-track { background: var(--secondary); }
 .breakdown-track>span { display: block; height: 100%; border-radius: inherit; }
 .breakdown-row:hover .breakdown-label { text-decoration: underline; text-underline-offset: 3px; }
 .back-to-history { margin-bottom: 1.25rem; }
