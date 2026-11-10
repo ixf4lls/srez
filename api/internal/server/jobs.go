@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hh-analytics/internal/core"
 	"log"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -124,14 +125,99 @@ func (j *Jobs) fail(ctx context.Context, a *core.Analysis, err error) {
 	j.finish(a, "attention", "Сбор прерван. Сохранённые данные доступны.", err)
 }
 
+type SearchItem struct{ Title, URL, Employer, Address, Compensation string }
+
 type SearchResult struct {
-	Items                     []struct{ Title, URL, Employer, Address, Compensation string } `json:"items"`
-	Total                     int                                                            `json:"total"`
-	NextURL                   string                                                         `json:"nextUrl"`
+	Items                     []SearchItem `json:"items"`
+	Total                     int          `json:"total"`
+	TotalKnown                bool         `json:"totalKnown"`
+	Recognized                bool         `json:"recognized"`
+	NextURL                   string       `json:"nextUrl"`
 	VisibleLastPage, PageSize int
 	NextPage                  *int  `json:"nextPage"`
 	HasMore                   *bool `json:"hasMore"`
+	CurrentPage               *int  `json:"currentPage"`
 }
+
+var vacancyPath = regexp.MustCompile(`^/vacancy/(\d+)/?$`)
+
+func vacancyID(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || (u.Hostname() != "hh.ru" && !strings.HasSuffix(u.Hostname(), ".hh.ru")) {
+		return ""
+	}
+	match := vacancyPath.FindStringSubmatch(u.Path)
+	if len(match) != 2 {
+		return ""
+	}
+	return match[1]
+}
+
+func pageSignature(page SearchResult) string {
+	ids := map[string]bool{}
+	for _, item := range page.Items {
+		ids[vacancyID(item.URL)] = true
+	}
+	keys := make([]string, 0, len(ids))
+	for id := range ids {
+		keys = append(keys, id)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
+}
+
+func searchHasMore(page SearchResult, index int) bool {
+	return page.NextURL != "" || (page.HasMore != nil && *page.HasMore) ||
+		(page.NextPage != nil && *page.NextPage > index) || page.VisibleLastPage > index+1 ||
+		(page.PageSize > 0 && page.Total > (index+1)*page.PageSize)
+}
+
+func validateSearchPage(page SearchResult, index int, seen map[string]bool) error {
+	bad := func(reason string) error { return &ProviderError{Class: "drift", Reason: reason} }
+	if page.CurrentPage != nil && *page.CurrentPage != index {
+		return bad("hh.ru вернул другую страницу выдачи")
+	}
+	if len(page.Items) == 0 {
+		if searchHasMore(page, index) || (page.Total > 0 && (page.PageSize == 0 || index*page.PageSize < page.Total)) {
+			return bad("hh.ru вернул пустую страницу до конца выдачи")
+		}
+		if !page.Recognized && !page.TotalKnown && page.HasMore == nil {
+			return bad("Не удалось подтвердить пустую выдачу hh.ru")
+		}
+		return nil
+	}
+	ids := map[string]bool{}
+	for _, item := range page.Items {
+		id := vacancyID(item.URL)
+		if id == "" {
+			return bad("В выдаче обнаружена некорректная ссылка на вакансию")
+		}
+		ids[id] = true
+	}
+	if page.PageSize > 0 && page.Total > 0 {
+		expected := min(page.PageSize, max(0, page.Total-index*page.PageSize))
+		if len(ids) < expected {
+			return bad(fmt.Sprintf("Неполная страница hh.ru: %d из %d ссылок", len(ids), expected))
+		}
+	}
+	if seen[pageSignature(page)] {
+		return bad("hh.ru повторил уже полученную страницу выдачи")
+	}
+	return nil
+}
+
+func validateDetail(detail Detail) error {
+	if strings.TrimSpace(detail.Title) == "" || strings.TrimSpace(detail.Description) == "" {
+		return &ProviderError{Class: "drift", Reason: "hh.ru не вернул название и полное описание вакансии"}
+	}
+	return nil
+}
+
+func stopsCollection(err error) bool {
+	var provider *ProviderError
+	return errors.As(err, &provider) && provider.Class != "input" && provider.Class != "error" && provider.Class != "drift"
+}
+
 type Detail struct {
 	Title, Company, Salary, Experience, Employment, EmploymentForm, WorkSchedule, WorkingHours, Address, City, Description, PublishedAt string
 	WorkFormats, KeySkills                                                                                                              []string
@@ -147,6 +233,13 @@ func (j *Jobs) run(ctx context.Context, id string) {
 	a.Status = "running"
 	a.Error = ""
 	a.CompletedAt = nil
+	a.Warnings = []string{}
+	// Older jobs omitted links already loaded by a different analysis.
+	if a.Skipped > 0 {
+		a.NextPage = 0
+		a.SearchDone = false
+		a.Skipped = 0
+	}
 	a.Stage = "links"
 	a.Message = "Собираем ссылки на вакансии"
 	if err = j.save(&a); err != nil {
@@ -160,10 +253,19 @@ func (j *Jobs) run(ctx context.Context, id string) {
 	}
 	seen := map[string]bool{}
 	for _, v := range existing {
+		if v.Loaded && validateDetail(Detail{Title: v.Title, Description: v.Description}) != nil {
+			v.Loaded = false
+			if err = j.Store.PutVacancy(ctx, id, v, true); err != nil {
+				j.fail(ctx, &a, err)
+				return
+			}
+		}
 		seen[v.ID] = true
 	}
-	linkSeen := map[string]bool{}
+	a.Collected = len(seen)
 	pagesSeen := map[string]bool{}
+	var searchErr error
+	passes := 0
 	for !a.SearchDone && a.NextPage < 40 {
 		if ctx.Err() != nil {
 			j.fail(ctx, &a, ctx.Err())
@@ -175,49 +277,27 @@ func (j *Jobs) run(ctx context.Context, id string) {
 				args[key] = value
 			}
 		}
-		var page SearchResult
-		result, err := j.Runner.Call(ctx, "search", args, &page)
+		attemptItems := []SearchItem{}
+		result, page, err := callRunner(ctx, j.Runner, "search", args, func(page SearchResult) error {
+			attemptItems = append(attemptItems, page.Items...)
+			return validateSearchPage(page, a.NextPage, pagesSeen)
+		})
 		if err != nil {
-			j.fail(ctx, &a, err)
-			return
+			if ctx.Err() != nil || stopsCollection(err) {
+				j.fail(ctx, &a, err)
+				return
+			}
+			searchErr = err
 		}
 		if result.Healed {
 			a.Warnings = append(a.Warnings, "api-anything обновил операцию: "+fmt.Sprint(result.Heal.Changes))
 		}
-		if page.Total > 0 {
+		if page.TotalKnown || page.Total > 0 {
 			a.Found = page.Total
 		}
-		pageIDs := []string{}
-		for _, item := range page.Items {
-			m := regexp.MustCompile(`/vacancy/(\d+)`).FindStringSubmatch(item.URL)
-			if len(m) > 1 {
-				pageIDs = append(pageIDs, m[1])
-			}
-		}
-		sort.Strings(pageIDs)
-		signature := strings.Join(pageIDs, ",")
-		repeated := pagesSeen[signature]
-		pagesSeen[signature] = true
-		known, err := j.Store.LoadedVacancyIDs(ctx, pageIDs)
-		if err != nil {
-			j.fail(ctx, &a, err)
-			return
-		}
-		for _, item := range page.Items {
-			match := regexp.MustCompile(`/vacancy/(\d+)`).FindStringSubmatch(item.URL)
-			if len(match) < 2 {
-				continue
-			}
-			vid := match[1]
-			if linkSeen[vid] {
-				continue
-			}
-			linkSeen[vid] = true
-			if seen[vid] {
-				continue
-			}
-			if known[vid] {
-				a.Skipped++
+		for _, item := range attemptItems {
+			vid := vacancyID(item.URL)
+			if vid == "" || seen[vid] {
 				continue
 			}
 			seen[vid] = true
@@ -228,34 +308,39 @@ func (j *Jobs) run(ctx context.Context, id string) {
 			}
 		}
 		a.Collected = len(seen)
+		if searchErr != nil {
+			break
+		}
+		pagesSeen[pageSignature(page)] = true
+		hasMore := searchHasMore(page, a.NextPage)
 		a.NextPage++
-		if page.NextPage != nil && *page.NextPage >= a.NextPage {
-			a.NextPage = *page.NextPage
-		}
 		a.Message = fmt.Sprintf("Собираем ссылки · %d вакансий · страница %d", a.Collected, a.NextPage)
-		if len(page.Items) == 0 || (a.Found > 0 && a.Collected >= a.Found) {
-			a.SearchDone = true
-		}
-		if repeated && len(page.Items) > 0 {
-			a.SearchDone = true
-			a.Warnings = append(a.Warnings, "hh.ru повторил страницу выдачи. Анализ охватывает только собранные уникальные вакансии.")
-		}
-		if page.NextURL == "" && page.VisibleLastPage <= a.NextPage && (a.Found == 0 || a.Collected >= a.Found) {
-			a.SearchDone = true
-		}
-		if page.HasMore != nil && !*page.HasMore {
-			a.SearchDone = true
+		if !hasMore {
+			if a.Found > a.Collected && passes < 2 {
+				passes++
+				a.NextPage = 0
+				pagesSeen = map[string]bool{}
+				a.Message = fmt.Sprintf("Проверяем недостающие ссылки · %d из %d · проход %d", a.Collected, a.Found, passes+1)
+			} else if a.Found > a.Collected {
+				a.NextPage = 0
+				searchErr = &ProviderError{Class: "drift", Reason: fmt.Sprintf("После трёх проходов собрано %d из %d ссылок", a.Collected, a.Found)}
+			} else {
+				a.SearchDone = true
+			}
 		}
 		if err = j.save(&a); err != nil {
 			j.fail(ctx, &a, err)
 			return
 		}
+		if searchErr != nil {
+			break
+		}
 	}
-	if !a.SearchDone {
-		a.SearchDone = true
+	if !a.SearchDone && a.NextPage >= 40 {
 		a.Warnings = append(a.Warnings, "Достигнуто ограничение известной операции hh.ru: 40 страниц. Для полного охвата сузьте запрос или фильтры.")
+		searchErr = &ProviderError{Class: "input", Reason: "hh.ru ограничивает выдачу 40 страницами. Для полного охвата сузьте запрос или фильтры."}
 	}
-	if a.Found > a.Collected+a.Skipped {
+	if a.Found > a.Collected {
 		a.Warnings = append(a.Warnings, fmt.Sprintf("Выдача hh.ru: %d, собрано уникальных: %d. Статистика рассчитана по загруженным вакансиям.", a.Found, a.Collected))
 	}
 	a.Stage = "details"
@@ -284,29 +369,18 @@ func (j *Jobs) run(ctx context.Context, id string) {
 			j.fail(ctx, &a, ctx.Err())
 			return
 		}
-		var detail Detail
-		result, err := j.Runner.Call(ctx, "vacancy", map[string]string{"vacancyId": v.ID}, &detail)
+		result, detail, err := callRunner(ctx, j.Runner, "vacancy", map[string]string{"vacancyId": v.ID}, validateDetail)
 		if err != nil {
-			var p *ProviderError
-			if errors.As(err, &p) && p.Class == "input" {
-				v.Error = "Вакансия удалена или недоступна"
-				a.Failed++
-				if e := j.Store.PutVacancy(ctx, id, v, true); e != nil {
-					j.fail(ctx, &a, e)
-					return
-				}
-				continue
+			if ctx.Err() != nil || stopsCollection(err) {
+				j.fail(ctx, &a, err)
+				return
 			}
-			j.fail(ctx, &a, err)
-			return
-		}
-		if result.Healed {
-			a.Warnings = append(a.Warnings, "api-anything обновил операцию: "+fmt.Sprint(result.Heal.Changes))
-		}
-		if detail.Title == "" {
-			v.Error = "hh.ru не вернул полное описание"
+			v.Error = err.Error()
 			a.Failed++
 		} else {
+			if result.Healed {
+				a.Warnings = append(a.Warnings, "api-anything обновил операцию: "+fmt.Sprint(result.Heal.Changes))
+			}
 			v.Title = detail.Title
 			v.Company = detail.Company
 			v.Salary = detail.Salary
@@ -348,12 +422,9 @@ func (j *Jobs) run(ctx context.Context, id string) {
 	}
 	status := "completed"
 	message := "Анализ готов"
-	if a.Collected == 0 && a.Skipped > 0 && a.Found <= a.Skipped {
-		message = "Все найденные вакансии уже разобраны в других анализах"
-	}
-	if a.Failed > 0 || a.Found > a.Collected+a.Skipped || len(a.Warnings) > 0 {
+	if a.Processed != a.Collected || a.Found > a.Collected || !a.SearchDone || searchErr != nil {
 		status = "partial"
 		message = "Анализ готов по доступным данным"
 	}
-	j.finish(&a, status, message, nil)
+	j.finish(&a, status, message, searchErr)
 }

@@ -296,11 +296,11 @@ func (s *Server) resume(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "Анализ уже выполняется")
 		return
 	}
-	if a.Status == "completed" || (a.Status == "partial" && a.Failed == 0 && (a.Found <= a.Collected || a.NextPage >= 40)) {
+	if a.Status == "completed" || (a.Status == "partial" && a.Failed == 0 && a.SearchDone && a.Skipped == 0 && a.Found <= a.Collected) {
 		fail(w, 409, "Анализ уже завершён. Запустите новый поиск для обновления.")
 		return
 	}
-	if a.Status == "partial" && a.Found > a.Collected && a.NextPage < 40 {
+	if (a.Status == "partial" && (a.Found > a.Collected || !a.SearchDone)) || a.Skipped > 0 {
 		a.NextPage = 0
 		a.SearchDone = false
 		a.Warnings = []string{}

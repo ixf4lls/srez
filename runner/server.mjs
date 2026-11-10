@@ -44,6 +44,7 @@ function installSearch(args) {
     }
     // Search snippets are unnecessary: complete descriptions are fetched separately.
     url.searchParams.set('enable_snippets', 'false');
+    url.searchParams.set('items_on_page', '50');
     op.request.url = url.href;
     op.trigger.url = decodeURIComponent(url.href);
     delete op.checks;
@@ -80,19 +81,27 @@ async function execute(kind, input = {}) {
   let result = await complete(await call('hh', op, args, {
     maxTier:1, minIntervalMs:1200, timeoutMs:45000, view:{ maxChars:200000 }, fetchImpl,
   }));
-  if (!result.ok) return result;
+  if (!result.ok && (result.class !== 'drift' || !html)) return result;
   if (kind === 'filters') {
     const groups = filtersFromHTML(html);
     if (!groups.length) return { ok:false, class:'drift', reason:'hh.ru не вернул список фильтров. Доступные варианты не будут подменены вымышленными.' };
     return { ok:true, data:groups, fetchedAt:new Date().toISOString(), source:'hh.ru / api-anything', tier:result.tier };
   }
-  if (kind === 'search') return { ...result, data: searchPage(html, result.data) };
+  if (kind === 'search') {
+    const data = searchPage(html, result.data, 50);
+    if (!data.recognized) return { ok:false, class:'drift', reason:'hh.ru не вернул распознаваемую страницу выдачи.' };
+    return { ...result, ok:true, class:'ok', data };
+  }
   const value = Array.isArray(result.data) ? result.data[0] : result.data;
   const recipe = base.operations.find(x => x.name === 'getVacancyResponseCount').response.embedded.regex;
-  return { ...result, data: detailFromHTML(html, value, recipe) };
+  const data = detailFromHTML(html, value, recipe);
+  if (!data.title || !data.description || (data.sourceId != null && String(data.sourceId) !== String(args.vacancyId))) {
+    return { ok:false, class:'drift', reason:'hh.ru не вернул полное описание запрошенной вакансии.' };
+  }
+  return { ...result, ok:true, class:'ok', data };
 }
 
-// One queue for this site: no parallel requests, retries, or bypass of its cooldown.
+// API retries join this same queue and retain api-anything's request spacing and cooldown.
 let queue = Promise.resolve();
 const send = (res, status, data) => { res.writeHead(status, { 'content-type':'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
 http.createServer(async (req,res) => {

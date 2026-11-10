@@ -125,7 +125,7 @@ export function AnalysisView({ id, navigate, onRepeat, onChanged }: { id: string
   }
   if (!analysis) return error ? <ErrorNotice retry={() => { setError(''); void refresh(); }}>{error}</ErrorNotice> : <AnalysisSkeleton onBack={() => navigate('/history')} />;
   const a = analysis;
-  const canResume = !active && (['cancelled', 'attention', 'interrupted'].includes(a.status) || (a.status === 'partial' && (a.failed > 0 || (a.found > a.collected && a.nextPage < 40))));
+  const canResume = !active && (['cancelled', 'attention', 'interrupted'].includes(a.status) || (a.status === 'partial' && (a.failed > 0 || a.found > a.collected || (a.skipped ?? 0) > 0 || a.searchDone === false)));
   const breakdowns = (report: Report, mode: 'filters' | 'summary') => {
     const canFilter = mode === 'filters';
     return <div className="breakdown-stack">{(canFilter ? dimensions : sidebarDimensions).map(({ key, title }) => {

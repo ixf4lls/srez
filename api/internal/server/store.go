@@ -109,29 +109,6 @@ func (s *Store) Vacancies(ctx context.Context, id string) ([]core.Vacancy, error
 	return out, rows.Err()
 }
 
-// LoadedVacancyIDs returns snapshots that already contain a parsed detail
-// response. The lookup is intentionally global, so a new analysis can reuse
-// the existing snapshot by skipping that vacancy at link collection time.
-func (s *Store) LoadedVacancyIDs(ctx context.Context, ids []string) (map[string]bool, error) {
-	known := map[string]bool{}
-	if len(ids) == 0 {
-		return known, nil
-	}
-	rows, err := s.DB.Query(ctx, `SELECT id FROM vacancies WHERE id=ANY($1::text[]) AND document->>'loaded'='true'`, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		if err = rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		known[id] = true
-	}
-	return known, rows.Err()
-}
-
 // ResetVacancies keeps the collected link list but marks every detail as
 // stale. The refresh job then fetches each vacancy again without redoing the
 // search pages.
