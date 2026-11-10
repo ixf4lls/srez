@@ -1,4 +1,4 @@
-# srez
+# srez - анализ рынка вакансий
 
 ![srez](./docs/images/srez.png)
 
