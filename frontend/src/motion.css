@@ -14,11 +14,29 @@
     to { transform: none; }
   }
 
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .45; }
+  }
+
+  [data-slot='skeleton'] {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+
+  .data-reveal {
+    animation: fadeIn var(--motion-content) var(--motion-ease);
+  }
+
+  .skeleton-layout :is(.report-heading, .report-filterbar),
+  [aria-busy='true'] .report-overview > .series-stack > [data-slot='card'],
+  [aria-busy='true'] .report-overview > aside {
+    animation: none;
+  }
+
   .hero-content,
   .page-heading,
   .report-heading,
   .history-toolbar,
-  .history-table-wrap,
   .collection-card,
   .empty-state,
   .report-overview > .series-stack > [data-slot='card'],
@@ -27,7 +45,6 @@
       content-reveal var(--motion-enter) var(--motion-ease);
   }
 
-  .history-table-wrap,
   .report-overview > .series-stack > [data-slot='card']:nth-child(2) {
     animation-delay: 80ms;
     animation-fill-mode: backwards;
@@ -52,7 +69,6 @@
       content-reveal var(--motion-content) var(--motion-ease);
   }
 
-  .loading-state,
   .error-notice,
   .undo-toast {
     animation: fadeIn 300ms var(--motion-ease);

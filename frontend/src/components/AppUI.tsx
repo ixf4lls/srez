@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { AlertCircle, Check, CircleDashed, LoaderCircle, Pause } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { statusLabel } from '../types';
 
 export function StatusBadge({ status }: { status: string }) {
@@ -20,8 +19,4 @@ export function EmptyState({ title, description, action }: { title: string; desc
 
 export function ErrorNotice({ children, retry }: { children: ReactNode; retry?: () => void }) {
   return <div className="error-notice" role="alert"><AlertCircle size={17} aria-hidden="true" /><div>{children}</div>{retry && <Button variant="outline" size="sm" onClick={retry}>Повторить</Button>}</div>;
-}
-
-export function LoadingState({ text }: { text: string }) {
-  return <div className="loading-state" role="status"><p><LoaderCircle className="spin" size={16} aria-hidden="true" />{text}</p><Skeleton className="h-8 w-2/5" /><Skeleton className="h-40 w-full" /><Skeleton className="h-20 w-full" /></div>;
 }

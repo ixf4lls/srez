@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { ArrowLeft, History, Moon, Plus, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { api, isActive } from './types';
 import type { Analysis } from './types';
 import { SearchForm } from './components/SearchForm';
 import { HistoryView } from './components/HistoryView';
-import { EmptyState, LoadingState } from './components/AppUI';
+import { EmptyState } from './components/AppUI';
+import { AnalysisSkeleton } from './components/DataSkeletons';
 
 const AnalysisView = lazy(() => import('./components/AnalysisView').then(m => ({ default: m.AnalysisView })));
 
@@ -16,6 +17,7 @@ export default function App() {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [historyError, setHistoryError] = useState('');
   const [historyLoading, setHistoryLoading] = useState(true);
+  const historyLoaded = useRef(false);
   const [repeat, setRepeat] = useState<Analysis | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
@@ -35,7 +37,8 @@ export default function App() {
     event.preventDefault(); navigate('/history');
   }
   async function refresh() {
-    try { setAnalyses(await api<Analysis[]>('/analyses')); setHistoryError(''); }
+    if (!historyLoaded.current) setHistoryLoading(true);
+    try { setAnalyses(await api<Analysis[]>('/analyses')); historyLoaded.current = true; setHistoryError(''); }
     catch (e) { setHistoryError((e as Error).message); }
     finally { setHistoryLoading(false); }
   }
@@ -66,7 +69,7 @@ export default function App() {
       <IconButton variant="ghost" className="theme-toggle" aria-label={dark ? 'Включить светлую тему' : 'Включить тёмную тему'} title={dark ? 'Светлая тема' : 'Тёмная тема'} onClick={() => setDark(!dark)}>{dark ? <Sun /> : <Moon />}</IconButton>
     </nav></header>
     <main id="main-content" className={hero ? 'hero-main' : path === '/history' ? 'content-page history-content' : 'content-page'} tabIndex={-1}>
-      {id ? <Suspense fallback={<LoadingState text="Загружаем отчёт" />}><AnalysisView key={id} id={id} navigate={navigate} onChanged={() => void refresh()} onRepeat={a => { setRepeat(a); setFormKey(k => k + 1); navigate('/'); }} /></Suspense>
+      {id ? <Suspense fallback={<AnalysisSkeleton onBack={() => navigate('/history')} />}><AnalysisView key={id} id={id} navigate={navigate} onChanged={() => void refresh()} onRepeat={a => { setRepeat(a); setFormKey(k => k + 1); navigate('/'); }} /></Suspense>
         : path === '/history' ? <HistoryView analyses={analyses} loading={historyLoading} error={historyError} navigate={navigate} refresh={refresh} onNew={() => newAnalysis()} />
         : hero ? <SearchForm key={formKey} initial={repeat} onCreated={a => { setRepeat(null); navigate(`/analyses/${a.id}`); }} />
         : <EmptyState title="Страница не найдена" description="Откройте историю или начните новый анализ." action={<Button onClick={() => newAnalysis()}><ArrowLeft data-icon="inline-start" />Новый анализ</Button>} />}
