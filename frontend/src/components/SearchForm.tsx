@@ -53,7 +53,7 @@ export function SearchForm({ initial, onCreated }: { initial: Analysis | null; o
   }
   const selected = Object.entries(filters).filter(([, v]) => v);
   return <section className="hero-content">
-    <div className="hero-heading"><h1 className="wordmark">srez<span>.</span></h1><p>анализ рынка вакансий hh.ru</p></div>
+    <div className="hero-heading"><h1 className="wordmark">srez<span>.</span></h1><p>анализ рынка вакансий</p></div>
     <form className="hero-search" onSubmit={prepare}>
       <label className="hero-query-label" htmlFor="market-query">Какую должность или технологию исследуем?</label>
       <div className="hero-search-row"><Search className="hero-search-icon" size={20} aria-hidden="true" /><Input id="market-query" className="hero-query-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Должность, технология или стек" maxLength={1500} required autoComplete="off" />
