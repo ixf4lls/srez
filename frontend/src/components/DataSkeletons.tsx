@@ -22,6 +22,10 @@ export function TextSkeleton({ width = '100%', className = '' }: { width?: strin
   return <span data-slot="skeleton" aria-hidden="true" className={`skeleton-text rounded-md bg-muted ${className}`} style={{ width }} />;
 }
 
+export function HeadingSkeleton({ children }: { children: string }) {
+  return <><span className="sr-only">{children}</span><span data-slot="skeleton" aria-hidden="true" className="skeleton-text skeleton-heading rounded-md"><span className="invisible">{children}</span></span></>;
+}
+
 export function HistoryRowSkeleton() {
   return <tr aria-hidden="true">
     <td className="history-status"><Skeleton className="skeleton-status" /></td>
@@ -63,14 +67,14 @@ export function ReportDataSkeleton({ report }: { report?: Report }) {
     <div className="report-filterbar"><Skeleton className="h-8 w-12" /><TextSkeleton width="9rem" /><Skeleton className="skeleton-control skeleton-filter-button" /></div>
     <div className="report-tabs skeleton-tabs"><div className="skeleton-tab-list">{['4rem', '10rem', '6rem', '5rem'].map(width => <TextSkeleton key={width} width={width} />)}</div>
       <div className="report-overview"><div className="series-stack">
-        {[false, true].map(responses => <Card key={String(responses)}><CardHeader className="chart-card-header"><CardTitle>{responses ? 'Отклики' : 'Зарплаты'}</CardTitle><Skeleton className="skeleton-control skeleton-icon" /></CardHeader><CardContent>
+        {[false, true].map(responses => <Card key={String(responses)}><CardHeader className="chart-card-header"><CardTitle><HeadingSkeleton>{responses ? 'Отклики' : 'Зарплаты'}</HeadingSkeleton></CardTitle><Skeleton className="skeleton-control skeleton-icon" /></CardHeader><CardContent>
           <PlotSkeleton responses={responses} /><ChartFooterSkeleton />
           {!responses && <div className="salary-method"><TextSkeleton width="8rem" /></div>}
         </CardContent></Card>)}
       </div><aside>
-        <section className="breakdown market-index-card"><div className="breakdown-heading"><h2>Индекс рынка</h2><Skeleton className="skeleton-small-icon" /></div><Skeleton className="h-8 w-20" /></section>
+        <section className="breakdown market-index-card"><div className="breakdown-heading"><h2><HeadingSkeleton>Индекс рынка</HeadingSkeleton></h2><Skeleton className="skeleton-small-icon" /></div><Skeleton className="h-8 w-20" /></section>
         <div className="breakdown-stack">{sidebarSections.map(({ key, title, rows }) => <section className="breakdown" key={key}>
-          <div className="breakdown-heading"><div><h2>{title}</h2>{key === 'format' && <p className="breakdown-note">Форматы могут пересекаться</p>}</div><Skeleton className="skeleton-small-icon" /></div>
+          <div className="breakdown-heading"><div><h2><HeadingSkeleton>{title}</HeadingSkeleton></h2>{key === 'format' && <p className="breakdown-note"><HeadingSkeleton>Форматы могут пересекаться</HeadingSkeleton></p>}</div><Skeleton className="skeleton-small-icon" /></div>
           <div className="breakdown-rows">{Array.from({ length: Math.min(5, report?.dimensions[key]?.length ?? rows) }, (_, row) => <div className="breakdown-row" key={row}><TextSkeleton width={`${65 + row % 2 * 20}%`} /><TextSkeleton width="4rem" /><Skeleton className="breakdown-track" /></div>)}</div>
           {(report?.dimensions[key]?.length ?? 0) > 5 && <Skeleton className="breakdown-expand skeleton-source-button" />}
         </section>)}</div>

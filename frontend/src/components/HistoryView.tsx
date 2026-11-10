@@ -34,7 +34,7 @@ export function HistoryView({ analyses, loading, error, navigate, refresh, onNew
     finally { setRestoring(false); }
   }
   return <>
-    <PageHeading title="История анализов" description="Сохранённые отчёты о рынке вакансий." />
+    <PageHeading title="История анализов" description="Сохранённые отчёты о рынке вакансий." loading={loading} />
     {(error || actionError) && <ErrorNotice retry={error ? () => void refresh() : undefined}>{actionError || error}</ErrorNotice>}
     <div className="history-toolbar">
       <label className="form-field history-search"><span>Поиск по истории</span><div className="input-with-icon"><Search size={15} aria-hidden="true" /><Input placeholder="Найти анализ…" value={query} onChange={e => setQuery(e.target.value)} /></div></label>

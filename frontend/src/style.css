@@ -88,6 +88,7 @@
 [data-slot='skeleton'] { --skeleton-fill: color-mix(in srgb, var(--foreground) 10%, var(--background)); flex-shrink: 0; background: var(--skeleton-fill); }
 .skeleton-text { display: block; position: relative; max-width: 100%; height: 1lh; background: transparent; }
 .skeleton-text::after { content: ''; position: absolute; inset-inline: 0; top: 50%; height: .75em; transform: translateY(-50%); border-radius: inherit; background: var(--skeleton-fill); }
+.skeleton-heading { display: inline-block; vertical-align: top; }
 .skeleton-control { height: 2rem; width: 100%; }
 .skeleton-icon { width: 2rem; }
 .skeleton-small-icon { width: 1.5rem; height: 1.5rem; }

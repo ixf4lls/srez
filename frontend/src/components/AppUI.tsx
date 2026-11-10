@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { AlertCircle, Check, CircleDashed, LoaderCircle, Pause } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HeadingSkeleton } from './DataSkeletons';
 import { statusLabel } from '../types';
 
 export function StatusBadge({ status }: { status: string }) {
@@ -9,8 +10,8 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={status === 'attention' ? 'destructive' : 'secondary'} className={['queued', 'running'].includes(status) ? 'active-status' : ''}><Icon data-icon="inline-start" className={status === 'running' ? 'spin' : ''} />{statusLabel[status] || status}</Badge>;
 }
 
-export function PageHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
-  return <div className="page-heading"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{action}</div>;
+export function PageHeading({ title, description, action, loading = false }: { title: string; description?: string; action?: ReactNode; loading?: boolean }) {
+  return <div className="page-heading" aria-busy={loading || undefined}><div><h1>{loading ? <HeadingSkeleton>{title}</HeadingSkeleton> : <span className="data-reveal">{title}</span>}</h1>{description && <p>{description}</p>}</div>{action}</div>;
 }
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
