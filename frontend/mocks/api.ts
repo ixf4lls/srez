@@ -1,6 +1,7 @@
 import type { Analysis, Filters } from '../src/types.ts';
 import { filterGroups, makeEntries, makeEntry, makeReport } from './fixtures.ts';
 import type { MockEntry } from './fixtures.ts';
+import { parseExclusionWords } from '../src/searchExclusions.ts';
 
 type Reply = { status: number; body: unknown };
 type Input = { query?: string; title?: string; mode?: string; excludeWords?: string; expression?: string; confirmed?: boolean; filters?: Filters; filterLabels?: Filters; scenario?: string };
@@ -10,13 +11,7 @@ const failure = (status: number, error: string) => reply(status, { error });
 // The mock keeps the exclusion contract; technology/role expansion is tested
 // against the real Go API in e2e/search-exclusions.spec.ts.
 function applyExclusions(expression: string, raw = '') {
-  const seen = new Set<string>();
-  const words: string[] = [];
-  for (const part of raw.split(/[,;\n\r]/)) {
-    const word = part.replaceAll('"', '').trim().replace(/\s+/g, ' ');
-    if (!word || seen.has(word.toLowerCase())) continue;
-    seen.add(word.toLowerCase()); words.push(word);
-  }
+  const words = parseExclusionWords(raw);
   if (!words.length) return expression;
   const clause = `NOT (${words.flatMap(word => [`NAME:"${word}"`, `DESCRIPTION:"${word}"`]).join(' OR ')})`;
   const suffix = ` AND ${clause}`;

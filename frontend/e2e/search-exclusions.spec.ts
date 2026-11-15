@@ -3,6 +3,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
 
 const apiURL = 'http://127.0.0.1:18081';
 const exclusions = 'стажёр, продажи, руководитель проекта, СТАЖЁР';
+const exclusionsLabel = '«стажёр» · «продажи» · «руководитель проекта»';
 const exclusionClause = 'NOT (NAME:"стажёр" OR DESCRIPTION:"стажёр" OR NAME:"продажи" OR DESCRIPTION:"продажи" OR NAME:"руководитель проекта" OR DESCRIPTION:"руководитель проекта")';
 type State = { analyses: { id: string; query: string; excludeWords: string; expression: string }[]; searches: Record<string, string>[]; unexpected: string[] };
 const externalRequests = new WeakMap<Page, string[]>();
@@ -43,14 +44,14 @@ test('optimizes, confirms, saves and restores exclusions through the real API', 
   await page.screenshot({ path: testInfo.outputPath('search-filters.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Готово', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Фильтры/ })).toHaveText('Фильтры2');
-  await expect(page.getByRole('button', { name: 'Убрать фильтр Исключить слова', exact: true })).toContainText(exclusions);
+  await expect(page.getByRole('button', { name: 'Убрать фильтр Исключить слова', exact: true })).toHaveText(`Исключить: ${exclusionsLabel}`);
   await page.getByRole('button', { name: 'Анализировать', exact: true }).click();
   const expression = page.getByRole('textbox', { name: 'Выражение для hh.ru', exact: true });
   await expect(expression).toHaveValue(new RegExp(`^\\(NAME:\\(python OR питон\\) AND \\(postgresql OR postgres\\)\\) AND NOT`));
   const prepared = await expression.inputValue();
   expect(prepared).toContain(exclusionClause);
   expect(prepared.match(/"стажёр"/g)).toHaveLength(2);
-  await expect(page.getByRole('dialog')).toContainText(exclusions);
+  await expect(page.getByRole('dialog')).toContainText(exclusionsLabel);
   await page.getByRole('button', { name: 'Подтвердить и запустить', exact: true }).click();
   await expect(page).toHaveURL(/\/analyses\/[a-f0-9]{24}$/);
   await expect.poll(async () => (await state(request)).searches.map(args => args.text)).toContain(prepared);
@@ -139,4 +140,74 @@ test('shows an error for an oversized generated expression and preserves the fie
   await expect(await openFilters(page)).toHaveValue('я'.repeat(800));
   expect((await state(request)).analyses).toHaveLength(0);
   expect((await state(request)).searches).toHaveLength(0);
+});
+
+test('applies normalized exclusion items only after Done and discards unconfirmed edits', async ({ page, request }) => {
+  const chip = page.getByRole('button', { name: 'Убрать фильтр Исключить слова', exact: true });
+  const filterButton = page.getByRole('button', { name: /^Фильтры/ });
+  await page.getByLabel('Какую должность или технологию исследуем?').fill('Python');
+  await (await openFilters(page)).fill('стажёр; "холодные   звонки", СТАЖЁР');
+  await expect(chip).toHaveCount(0);
+  await expect(filterButton).toHaveText('Фильтры');
+  await page.keyboard.press('Escape');
+  await expect(chip).toHaveCount(0);
+  await expect(await openFilters(page)).toHaveValue('');
+  await page.getByLabel('Исключить слова', { exact: true }).fill('стажёр; "холодные   звонки", СТАЖЁР');
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
+  await expect(chip).toHaveText('Исключить: «стажёр» · «холодные звонки»');
+  await expect(filterButton).toHaveText('Фильтры1');
+  await (await openFilters(page)).fill('продажи');
+  await expect(chip).toHaveText('Исключить: «стажёр» · «холодные звонки»');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Анализировать', exact: true }).click();
+  const expression = page.getByRole('textbox', { name: 'Выражение для hh.ru', exact: true });
+  await expect(expression).toHaveValue(/NAME:"стажёр" OR DESCRIPTION:"стажёр" OR NAME:"холодные звонки"/);
+  await expect(expression).not.toHaveValue(/продажи/);
+  await page.getByRole('button', { name: 'Назад', exact: true }).click();
+  await expect(await openFilters(page)).toHaveValue('стажёр; "холодные   звонки", СТАЖЁР');
+  await page.getByLabel('Исключить слова', { exact: true }).fill('продажи, junior');
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
+  await expect(chip).toHaveText('Исключить: «продажи» · «junior»');
+  await openFilters(page);
+  await page.getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await expect(chip).toHaveText('Исключить: «продажи» · «junior»');
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
+  await expect(chip).toHaveCount(0);
+  expect((await state(request)).analyses).toHaveLength(0);
+});
+
+test('keeps all eight HH filters accessible inside the existing scrollable height', async ({ page, request }, testInfo) => {
+  await page.getByLabel('Какую должность или технологию исследуем?').fill('Python');
+  await (await openFilters(page)).fill('junior');
+  const groups = page.locator('.form-filter-grid select');
+  await expect(groups).toHaveCount(8);
+  for (const label of ['Регион', 'Опыт работы', 'Формат работы', 'Тип оформления', 'Образование', 'Специализация', 'График работы', 'Рабочие часы']) {
+    await expect(page.locator('.form-filter-grid .form-field').filter({ hasText: label })).toHaveCount(1);
+  }
+  const body = page.locator('.search-filters-body');
+  const dimensions = await body.evaluate(element => ({
+    height: element.clientHeight, contentHeight: element.scrollHeight, overflow: getComputedStyle(element).overflowY,
+  }));
+  expect(dimensions.overflow).toBe('auto');
+  expect(dimensions.contentHeight).toBeGreaterThan(dimensions.height);
+  expect(dimensions.height).toBeLessThanOrEqual(testInfo.project.name === 'mobile' ? 384 : 416);
+  const hours = groups.last();
+  await hours.scrollIntoViewIfNeeded();
+  await hours.selectOption({ index: 1 });
+  await body.hover();
+  await page.mouse.wheel(0, 1000);
+  await expect.poll(() => body.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
+  const lastFieldBounds = await hours.boundingBox();
+  const bodyBounds = await body.boundingBox();
+  expect(lastFieldBounds!.y + lastFieldBounds!.height).toBeLessThanOrEqual(bodyBounds!.y + bodyBounds!.height);
+  expect(await body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: 'Готово', exact: true })).toBeInViewport();
+  await expect(page.getByRole('heading', { name: 'Фильтры поиска', exact: true })).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath('all-filters-scrolled.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Готово', exact: true }).click();
+  await page.getByRole('button', { name: 'Анализировать', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Выражение для hh.ru', exact: true })).toHaveValue(/NOT/);
+  await page.getByRole('button', { name: 'Подтвердить и запустить', exact: true }).click();
+  await expect(page).toHaveURL(/\/analyses\/[a-f0-9]{24}$/);
+  await expect.poll(async () => (await state(request)).searches.map(args => args.working_hours)).toContain('HOURS_8');
 });

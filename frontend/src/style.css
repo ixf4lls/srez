@@ -51,8 +51,9 @@
 .hero-submit { padding-inline: 1rem; }
 .selected-filter-list { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
 .search-filters-popover { width: min(36rem, calc(100vw - 2rem)); padding: 0; max-height: var(--radix-popover-content-available-height); display: flex; flex-direction: column; overflow: hidden; }
-.search-filters-popover [data-slot='popover-header'] { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
-.search-filters-body { padding: 1.25rem; overflow-y: auto; max-height: min(26rem, 55svh); }
+.search-filters-popover [data-slot='popover-header'] { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.search-filters-body { flex: 1 1 auto; min-height: 0; padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; max-height: min(26rem, 55svh); }
+.search-filters-popover>.popover-actions { flex-shrink: 0; }
 .search-exclusions { margin-bottom: 1.25rem; }
 .form-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1rem; }
 .popover-actions { display: flex; justify-content: space-between; padding: .875rem 1.25rem; gap: 1rem; border-top: 1px solid var(--border); }
