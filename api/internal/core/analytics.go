@@ -207,8 +207,35 @@ func WorkFormats(v Vacancy) []string {
 	return result
 }
 
+// GradeLabels returns the individual memberships of a vacancy without changing
+// the saved grade declaration. A repeated grade counts only once per vacancy.
+func GradeLabels(value string) []string {
+	labels := []string{}
+	seen := map[string]bool{}
+	for _, part := range strings.Split(value, "/") {
+		label := strings.TrimSpace(part)
+		if label == "" {
+			continue
+		}
+		for _, canonical := range []string{"Junior", "Middle", "Senior", "Lead", "Не указан"} {
+			if strings.EqualFold(label, canonical) {
+				label = canonical
+				break
+			}
+		}
+		if !seen[label] {
+			labels = append(labels, label)
+			seen[label] = true
+		}
+	}
+	if len(labels) == 0 {
+		return []string{"Не указан"}
+	}
+	return labels
+}
+
 func BuildReport(vacancies []Vacancy) *Report {
-	r := &Report{Dimensions: map[string][]Metric{}, Skills: []Metric{}, Requirements: []Metric{}, Responses: []ResponsePoint{}, Version: "rules-v5"}
+	r := &Report{Dimensions: map[string][]Metric{}, Skills: []Metric{}, Requirements: []Metric{}, Responses: []ResponsePoint{}, Version: "rules-v6"}
 	groups := map[string]map[string]*Metric{}
 	for _, dim := range []string{"city", "format", "employmentForm", "experience", "grade"} {
 		groups[dim] = map[string]*Metric{}
@@ -241,8 +268,11 @@ func BuildReport(vacancies []Vacancy) *Report {
 			continue
 		}
 		r.Total++
-		for _, d := range []struct{ key, value, field string }{{"city", v.City, "city"}, {"experience", v.Experience, "experience"}, {"grade", v.Grade, "grade"}} {
+		for _, d := range []struct{ key, value, field string }{{"city", v.City, "city"}, {"experience", v.Experience, "experience"}} {
 			add(groups[d.key], d.value, d.value, "", v, d.field, d.value)
+		}
+		for _, label := range GradeLabels(v.Grade) {
+			add(groups["grade"], label, label, "", v, "grade", label)
 		}
 		for _, label := range WorkFormats(v) {
 			add(groups["format"], label, label, "", v, "workFormats", label)

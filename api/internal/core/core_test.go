@@ -125,8 +125,12 @@ func TestReportDenominatorsAndSnapshots(t *testing.T) {
 		for _, m := range dim {
 			sum += m.Count
 		}
-		if sum != 3 {
-			t.Fatal("pie categories must be mutually exclusive")
+		want := 3
+		if key == "grade" {
+			want = 4 // The Middle/Senior source belongs to both categories.
+		}
+		if sum != want {
+			t.Fatalf("%s category count = %d, want %d", key, sum, want)
 		}
 	}
 }

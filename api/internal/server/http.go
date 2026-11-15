@@ -370,13 +370,15 @@ func (s *Server) Recover(ctx context.Context) error {
 			if getErr != nil {
 				return getErr
 			}
-			if full.Report != nil && (full.Report.Version == "rules-v1" || full.Report.Version == "rules-v2" || full.Report.Version == "rules-v3" || full.Report.Version == "rules-v4") {
+			if full.Report != nil && (full.Report.Version == "rules-v1" || full.Report.Version == "rules-v2" || full.Report.Version == "rules-v3" || full.Report.Version == "rules-v4" || full.Report.Version == "rules-v5") {
 				vacancies, loadErr := s.Store.Vacancies(ctx, a.ID)
 				if loadErr != nil {
 					return loadErr
 				}
+				// v5 snapshots already contain normalized source fields. Rebuild
+				// their memberships without rewriting saved vacancy declarations.
 				for i := range vacancies {
-					if vacancies[i].Loaded {
+					if vacancies[i].Loaded && full.Report.Version != "rules-v5" {
 						core.NormalizeVacancy(&vacancies[i])
 						if err = s.Store.PutVacancy(ctx, a.ID, vacancies[i], true); err != nil {
 							return err
