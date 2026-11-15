@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, LoaderCircle, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,9 @@ export function SearchForm({ initial, onCreated }: { initial: Analysis | null; o
   const [filters, setFilters] = useState<Filters>(initial?.filters || {});
   const [groups, setGroups] = useState<FilterGroup[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const [filterContent, setFilterContent] = useState<HTMLDivElement | null>(null);
+  const [filterSideOffset, setFilterSideOffset] = useState(12);
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [filterError, setFilterError] = useState('');
   const [error, setError] = useState('');
@@ -30,6 +33,34 @@ export function SearchForm({ initial, onCreated }: { initial: Analysis | null; o
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [expression, setExpression] = useState('');
+  useLayoutEffect(() => {
+    if (!filtersOpen) return;
+    const content = filterContent;
+    const trigger = filterTriggerRef.current;
+    if (!content || !trigger) return;
+    const fitFilterWindow = () => {
+      const height = content.offsetHeight;
+      const anchor = trigger.getBoundingClientRect();
+      const below = anchor.bottom + 12;
+      const above = anchor.top - 12 - height;
+      // A tall window can overlap its trigger to use the viewport instead of
+      // being squeezed into the smaller space on either side of the search bar.
+      const top = below >= 16 && below + height <= innerHeight - 16 ? below
+        : above >= 16 && above + height <= innerHeight - 16 ? above
+        : Math.max(16, Math.min(below, innerHeight - 16 - height));
+      setFilterSideOffset(top - anchor.bottom);
+    };
+    fitFilterWindow();
+    const observer = new ResizeObserver(fitFilterWindow);
+    observer.observe(content);
+    window.addEventListener('resize', fitFilterWindow);
+    window.addEventListener('scroll', fitFilterWindow, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', fitFilterWindow);
+      window.removeEventListener('scroll', fitFilterWindow, true);
+    };
+  }, [filterContent, filtersOpen, filtersLoading, filterError, groups]);
   async function loadFilters() {
     setFiltersLoading(true); setFilterError('');
     try { setGroups((await api<{ groups: FilterGroup[] }>('/filters')).groups); }
@@ -65,8 +96,8 @@ export function SearchForm({ initial, onCreated }: { initial: Analysis | null; o
     <form className="hero-search" onSubmit={prepare}>
       <label className="hero-query-label" htmlFor="market-query">Какую должность или технологию исследуем?</label>
       <div className="hero-search-row"><Search className="hero-search-icon" size={20} aria-hidden="true" /><Input id="market-query" className="hero-query-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Должность, технология или стек" maxLength={1500} required autoComplete="off" />
-        <Popover open={filtersOpen} onOpenChange={openFilters}><PopoverTrigger asChild><Button type="button" variant="ghost" className="hero-filter-button"><SlidersHorizontal data-icon="inline-start" />Фильтры{selectedCount > 0 && <Badge variant="secondary">{selectedCount}</Badge>}</Button></PopoverTrigger>
-          <PopoverContent align="end" sideOffset={12} collisionPadding={16} className="search-filters-popover" aria-label="Фильтры поиска"><PopoverHeader><h2>{filtersLoading ? <HeadingSkeleton>Фильтры поиска</HeadingSkeleton> : <span className="data-reveal">Фильтры поиска</span>}</h2></PopoverHeader>
+        <Popover open={filtersOpen} onOpenChange={openFilters}><PopoverTrigger asChild><Button ref={filterTriggerRef} type="button" variant="ghost" className="hero-filter-button"><SlidersHorizontal data-icon="inline-start" />Фильтры{selectedCount > 0 && <Badge variant="secondary">{selectedCount}</Badge>}</Button></PopoverTrigger>
+          <PopoverContent ref={setFilterContent} align="end" side="bottom" sideOffset={filterSideOffset} collisionPadding={16} className="search-filters-popover" aria-label="Фильтры поиска"><PopoverHeader><h2>{filtersLoading ? <HeadingSkeleton>Фильтры поиска</HeadingSkeleton> : <span className="data-reveal">Фильтры поиска</span>}</h2></PopoverHeader>
             <div className="search-filters-body"><label className="form-field search-exclusions"><span id="search-exclusions-label">Исключить слова</span><Input aria-labelledby="search-exclusions-label" value={draftExcludeWords} onChange={e => setDraftExcludeWords(e.target.value)} placeholder="Например: стажёр, продажи, холодные звонки" maxLength={1600} aria-describedby="search-exclusions-hint" autoComplete="off" /><span className="field-hint" id="search-exclusions-hint">Разделяйте слова и фразы запятыми. Исключаем из названия и описания вакансии.</span></label>{filtersLoading ? <SearchFiltersSkeleton /> : filterError ? <ErrorNotice retry={() => void loadFilters()}>{filterError}</ErrorNotice> : <div className="form-filter-grid data-reveal">{groups.map(g => <label className="form-field" key={g.key}><span>{g.label}</span><NativeSelect value={filters[g.key] || ''} onChange={e => setFilters({ ...filters, [g.key]: e.target.value })}><option value="">Без ограничений</option>{g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</NativeSelect></label>)}</div>}</div>
             <div className="popover-actions"><Button type="button" variant="ghost" size="sm" onClick={() => { setFilters({}); setDraftExcludeWords(''); }} disabled={!selected.length && !draftExcludeWords}>Сбросить</Button><Button type="button" size="sm" onClick={() => { setExcludeWords(draftExcludeWords); setFiltersOpen(false); }}>Готово</Button></div>
           </PopoverContent>

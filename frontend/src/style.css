@@ -50,9 +50,9 @@
 .hero-search-options { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
 .hero-submit { padding-inline: 1rem; }
 .selected-filter-list { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
-.search-filters-popover { width: min(36rem, calc(100vw - 2rem)); padding: 0; max-height: var(--radix-popover-content-available-height); display: flex; flex-direction: column; overflow: hidden; }
+.search-filters-popover { width: min(36rem, calc(100vw - 2rem)); padding: 0; max-height: calc(100dvh - 2rem); display: flex; flex-direction: column; overflow: hidden; }
 .search-filters-popover [data-slot='popover-header'] { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.search-filters-body { flex: 1 1 auto; min-height: 0; padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; max-height: min(26rem, 55svh); }
+.search-filters-body { flex: 1 1 auto; min-height: 0; padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .search-filters-popover>.popover-actions { flex-shrink: 0; }
 .search-exclusions { margin-bottom: 1.25rem; }
 .form-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1rem; }
@@ -358,7 +358,7 @@ mark, .highlight-field { background: var(--secondary); color: var(--foreground);
   .skeleton-source-button { height: 2.75rem; }
   .skeleton-title { height: 2rem; }
   .skeleton-tab-list { gap: 1rem; }
-  .search-filters-body { max-height: min(24rem, 50svh); padding: 1rem; }
+  .search-filters-body { padding: 1rem; }
   .page-heading { margin-bottom: 1.75rem; }
   .history-toolbar { gap: .875rem; }
   .toolbar-select { flex: 1; flex-direction: column; align-items: stretch; gap: .375rem; }

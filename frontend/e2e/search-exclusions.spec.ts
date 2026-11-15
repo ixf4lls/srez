@@ -176,7 +176,7 @@ test('applies normalized exclusion items only after Done and discards unconfirme
   expect((await state(request)).analyses).toHaveLength(0);
 });
 
-test('keeps all eight HH filters accessible inside the existing scrollable height', async ({ page, request }, testInfo) => {
+test('keeps all eight HH filters accessible in a window that fits the viewport', async ({ page, request }, testInfo) => {
   await page.getByLabel('Какую должность или технологию исследуем?').fill('Python');
   await (await openFilters(page)).fill('junior');
   const groups = page.locator('.form-filter-grid select');
@@ -189,18 +189,19 @@ test('keeps all eight HH filters accessible inside the existing scrollable heigh
     height: element.clientHeight, contentHeight: element.scrollHeight, overflow: getComputedStyle(element).overflowY,
   }));
   expect(dimensions.overflow).toBe('auto');
-  expect(dimensions.contentHeight).toBeGreaterThan(dimensions.height);
-  expect(dimensions.height).toBeLessThanOrEqual(testInfo.project.name === 'mobile' ? 384 : 416);
+  expect(dimensions.height).toBeLessThanOrEqual(page.viewportSize()!.height - 32);
   const hours = groups.last();
   await hours.scrollIntoViewIfNeeded();
   await hours.selectOption({ index: 1 });
-  await body.hover();
-  await page.mouse.wheel(0, 1000);
-  await expect.poll(() => body.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
+  if (dimensions.contentHeight > dimensions.height) {
+    await body.hover();
+    await page.mouse.wheel(0, 1000);
+    await expect.poll(() => body.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
+    expect(await body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  }
   const lastFieldBounds = await hours.boundingBox();
   const bodyBounds = await body.boundingBox();
   expect(lastFieldBounds!.y + lastFieldBounds!.height).toBeLessThanOrEqual(bodyBounds!.y + bodyBounds!.height);
-  expect(await body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Готово', exact: true })).toBeInViewport();
   await expect(page.getByRole('heading', { name: 'Фильтры поиска', exact: true })).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath('all-filters-scrolled.png'), animations: 'disabled' });
