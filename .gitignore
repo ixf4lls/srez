@@ -5,6 +5,8 @@ dist/
 *.log
 .DS_Store
 coverage/
+playwright-report/
+test-results/
 api/server
 
 .idea/

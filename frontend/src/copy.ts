@@ -129,6 +129,7 @@ const messages: Record<string, string> = {
   'Не удалось восстановить анализы': 'Could not restore the analyses.',
   'Сначала подтвердите поисковый запрос': 'Confirm the search query first.',
   'Исключения слишком длинные': 'The excluded terms are too long.',
+  'Исключения слишком длинные: не более 1600 символов': 'The excluded terms must be 1,600 characters or fewer.',
   'Недопустимый фильтр': 'Invalid filter.',
   'Не удалось создать анализ': 'Could not create the analysis.',
   'Название поиска должно быть не длиннее 180 символов': 'The search title must be 180 characters or fewer.',

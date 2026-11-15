@@ -7,6 +7,36 @@ type Input = { query?: string; title?: string; mode?: string; excludeWords?: str
 const reply = (status: number, body: unknown): Reply => ({ status, body: structuredClone(body) });
 const failure = (status: number, error: string) => reply(status, { error });
 
+// The mock keeps the exclusion contract; technology/role expansion is tested
+// against the real Go API in e2e/search-exclusions.spec.ts.
+function applyExclusions(expression: string, raw = '') {
+  const seen = new Set<string>();
+  const words: string[] = [];
+  for (const part of raw.split(/[,;\n\r]/)) {
+    const word = part.replaceAll('"', '').trim().replace(/\s+/g, ' ');
+    if (!word || seen.has(word.toLowerCase())) continue;
+    seen.add(word.toLowerCase()); words.push(word);
+  }
+  if (!words.length) return expression;
+  const clause = `NOT (${words.flatMap(word => [`NAME:"${word}"`, `DESCRIPTION:"${word}"`]).join(' OR ')})`;
+  const suffix = ` AND ${clause}`;
+  if (expression.endsWith(suffix)) {
+    const base = expression.slice(0, -suffix.length).trim();
+    let depth = 0;
+    let quoted = false;
+    const grouped = base.startsWith('(') && base.endsWith(')') && base.split('').every((char, index) => {
+      if (char === '"') quoted = !quoted;
+      if (!quoted) {
+        if (char === '(') depth++;
+        if (char === ')' && --depth === 0 && index !== base.length - 1) return false;
+      }
+      return true;
+    });
+    if (grouped && depth === 0 && !quoted) return expression;
+  }
+  return `(${expression}) AND ${clause}`;
+}
+
 export function createMockApi(now = () => Date.now()) {
   let entries = new Map(makeEntries(now()).map(entry => [entry.analysis.id, entry]));
   const update = (entry: MockEntry) => { entry.analysis.updatedAt = new Date(now()).toISOString(); };
@@ -57,16 +87,24 @@ export function createMockApi(now = () => Date.now()) {
         const query = typeof input.query === 'string' ? input.query.trim() : '';
         if (!query || query.length > 1500) return failure(400, 'Введите запрос длиной от 1 до 1500 символов');
         if (input.mode !== 'roles' && input.mode !== 'stack') return failure(400, 'Неизвестный режим релевантности');
-        if (path === '/api/prepare') return reply(200, { expression: input.mode === 'roles' ? `NAME:(${query})` : query, explanations: ['Тестовый запрос без обращения к hh.ru'], technologies: [] });
+        if (input.excludeWords !== undefined && (typeof input.excludeWords !== 'string' || [...input.excludeWords].length > 1600)) return failure(400, 'Исключения слишком длинные');
+        if (path === '/api/prepare') {
+          const base = /\b(?:AND|OR|NOT)\b|\b(?:NAME|DESCRIPTION|COMPANY_NAME):/i.test(query) ? query : input.mode === 'roles' ? `NAME:(${query})` : query;
+          const expression = applyExclusions(base, input.excludeWords);
+          if (new TextEncoder().encode(expression).length > 3000) return failure(400, 'Запрос должен содержать от 1 до 3000 символов');
+          return reply(200, { expression, explanations: ['Тестовый запрос без обращения к hh.ru'], technologies: [] });
+        }
         if (input.confirmed !== true) return failure(400, 'Сначала подтвердите поисковый запрос');
         if (typeof input.expression !== 'string' || !input.expression.trim() || input.expression.length > 3000) return failure(400, 'Запрос должен содержать от 1 до 3000 символов');
+        const expression = applyExclusions(input.expression.trim(), input.excludeWords);
+        if (new TextEncoder().encode(expression).length > 3000) return failure(400, 'Запрос должен содержать от 1 до 3000 символов');
         if (typeof input.title === 'string' && input.title.trim().length > 180) return failure(400, 'Название поиска должно быть не длиннее 180 символов');
         const filters = input.filters ?? {};
         if (typeof filters !== 'object' || Array.isArray(filters) || Object.entries(filters).some(([key, value]) => !filterGroups.some(group => group.key === key) || typeof value !== 'string')) return failure(400, 'Недопустимый фильтр');
         const id = crypto.randomUUID().replaceAll('-', '').slice(0, 24);
         const entry = makeEntry(id, now(), query);
         const title = input.title?.trim() || query;
-        Object.assign(entry.analysis, { title: title.startsWith('[Тест] ') ? title : `[Тест] ${title}`, mode: input.mode, excludeWords: input.excludeWords, expression: input.expression, filters, filterLabels: input.filterLabels ?? {} } satisfies Partial<Analysis>);
+        Object.assign(entry.analysis, { title: title.startsWith('[Тест] ') ? title : `[Тест] ${title}`, mode: input.mode, excludeWords: input.excludeWords, expression, filters, filterLabels: input.filterLabels ?? {} } satisfies Partial<Analysis>);
         start(entry); entries.set(id, entry);
         return reply(201, entry.analysis);
       }

@@ -53,6 +53,7 @@
 .search-filters-popover { width: min(36rem, calc(100vw - 2rem)); padding: 0; max-height: var(--radix-popover-content-available-height); display: flex; flex-direction: column; overflow: hidden; }
 .search-filters-popover [data-slot='popover-header'] { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
 .search-filters-body { padding: 1.25rem; overflow-y: auto; max-height: min(26rem, 55svh); }
+.search-exclusions { margin-bottom: 1.25rem; }
 .form-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem 1rem; }
 .popover-actions { display: flex; justify-content: space-between; padding: .875rem 1.25rem; gap: 1rem; border-top: 1px solid var(--border); }
 .query-confirm-dialog { max-height: calc(100svh - 2rem); overflow-y: auto; }

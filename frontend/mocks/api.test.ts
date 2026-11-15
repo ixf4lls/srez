@@ -44,6 +44,23 @@ test('all supporting routes and both query modes work without external services'
   assert.equal((api.handle('POST', '/api/prepare', { ...post, mode: 'stack' }).body as { expression: string }).expression, 'React');
 });
 
+test('exclusions are grouped, deduplicated and retained after confirmation', () => {
+  const api = createMockApi(() => initialTime);
+  const excludeWords = 'стажёр, холодные звонки, СТАЖЁР';
+  const clause = 'NOT (NAME:"стажёр" OR DESCRIPTION:"стажёр" OR NAME:"холодные звонки" OR DESCRIPTION:"холодные звонки")';
+  const prepared = api.handle('POST', '/api/prepare', { ...post, query: 'Python OR Java', excludeWords }).body as { expression: string };
+  assert.equal(prepared.expression, `(Python OR Java) AND ${clause}`);
+  const created = api.handle('POST', '/api/analyses', { ...post, expression: prepared.expression, excludeWords }).body as Analysis;
+  assert.equal(created.expression, prepared.expression);
+  assert.equal(created.excludeWords, excludeWords);
+  assert.equal((api.handle('GET', `/api/analyses/${created.id}`).body as Analysis).excludeWords, excludeWords);
+  const edited = api.handle('POST', '/api/analyses', { ...post, expression: 'NAME:python OR NAME:java', excludeWords }).body as Analysis;
+  assert.equal(edited.expression, `(NAME:python OR NAME:java) AND ${clause}`);
+  assert.equal(api.handle('POST', '/api/prepare', { ...post, excludeWords: 'x'.repeat(1601) }).status, 400);
+  assert.equal(api.handle('POST', '/api/prepare', { ...post, excludeWords: 'я'.repeat(800) }).status, 400);
+  assert.equal((api.handle('POST', '/api/prepare', { ...post, excludeWords: ' , ; ' }).body as { expression: string }).expression, 'NAME:(React)');
+});
+
 test('create, progress, cancel, resume and refresh retain isolated mutable state', () => {
   let time = initialTime;
   const api = createMockApi(() => time);
