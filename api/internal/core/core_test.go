@@ -63,7 +63,7 @@ func TestOptimizationAddsSafeTitleAndDescriptionExclusions(t *testing.T) {
 		t.Fatalf("missing exclusion clause: %s", p.Expression)
 	}
 	p, err = OptimizeWithExclusions(`NAME:(python OR golang)`, "roles", "junior")
-	if err != nil || !strings.HasPrefix(p.Expression, `NAME:(python OR golang) AND NOT`) {
+	if err != nil || !strings.HasPrefix(p.Expression, `(NAME:(python OR golang)) AND NOT`) {
 		t.Fatalf("explicit expression was not preserved: %+v %v", p, err)
 	}
 }

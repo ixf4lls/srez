@@ -5,12 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"hh-analytics/internal/core"
 	"time"
 )
 
-type Store struct{ DB *pgxpool.Pool }
+type storeDB interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+	Ping(context.Context) error
+	Close()
+}
+
+type Store struct{ DB storeDB }
 
 func NewStore(ctx context.Context, url string) (*Store, error) {
 	db, err := pgxpool.New(ctx, url)

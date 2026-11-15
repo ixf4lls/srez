@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 type Technology struct {
@@ -99,9 +100,13 @@ func OptimizeWithExclusions(query, mode, excludeWords string) (Proposal, error) 
 	if mode != "roles" && mode != "stack" {
 		return Proposal{}, errors.New("Неизвестный режим релевантности")
 	}
+	if utf8.RuneCountInString(excludeWords) > 1600 {
+		return Proposal{}, errors.New("Исключения слишком длинные: не более 1600 символов")
+	}
 	if isHHExpression(query) {
 		p := Proposal{query, []string{"Обнаружен язык запросов hh.ru. Ваше выражение сохранено без изменений."}, []string{}}
-		return appendExclusions(p, excludeWords), nil
+		p = appendExclusions(p, excludeWords)
+		return p, ValidateExpression(p.Expression)
 	}
 	var found []Technology
 	for _, t := range Technologies {
@@ -152,7 +157,8 @@ func OptimizeWithExclusions(query, mode, excludeWords string) (Proposal, error) 
 		explanations = append(explanations, "Поиск по всем полям вакансии: разработка, аналитика, QA, ML и другие специальности.")
 	}
 	explanations = append(explanations, "Поиск начнётся только после подтверждения. Можно изменить любое условие.")
-	return appendExclusions(Proposal{strings.Join(terms, " AND "), explanations, names}, excludeWords), nil
+	p := appendExclusions(Proposal{strings.Join(terms, " AND "), explanations, names}, excludeWords)
+	return p, ValidateExpression(p.Expression)
 }
 
 func isHHExpression(query string) bool {
@@ -161,7 +167,7 @@ func isHHExpression(query string) bool {
 	}
 	// Uppercase boolean operators are the notation documented by hh.ru. A
 	// lowercase "and" in a natural-language request remains optimizable.
-	return regexp.MustCompile(`\b(?:AND|OR|NOT)\b`).MatchString(query) && (strings.ContainsAny(query, "()\"") || strings.Contains(query, ":"))
+	return regexp.MustCompile(`\b(?:AND|OR|NOT)\b`).MatchString(query)
 }
 
 func parseExcludeWords(raw string) []string {
@@ -169,20 +175,14 @@ func parseExcludeWords(raw string) []string {
 	seen := map[string]bool{}
 	out := []string{}
 	for _, part := range parts {
-		word := strings.Join(strings.Fields(strings.Trim(part, " \t\"")), " ")
+		word := strings.Join(strings.Fields(strings.ReplaceAll(part, `"`, "")), " ")
 		if word == "" {
 			continue
-		}
-		if len([]rune(word)) > 80 {
-			word = string([]rune(word)[:80])
 		}
 		key := strings.ToLower(word)
 		if !seen[key] {
 			seen[key] = true
 			out = append(out, word)
-		}
-		if len(out) == 20 {
-			break
 		}
 	}
 	return out
@@ -195,18 +195,51 @@ func appendExclusions(p Proposal, raw string) Proposal {
 	}
 	terms := make([]string, 0, len(words)*2)
 	for _, word := range words {
-		quoted := `"` + strings.ReplaceAll(word, `"`, "") + `"`
+		quoted := `"` + word + `"`
 		terms = append(terms, "NAME:"+quoted, "DESCRIPTION:"+quoted)
 	}
 	clause := "NOT (" + strings.Join(terms, " OR ") + ")"
-	if !strings.Contains(p.Expression, clause) {
+	if !hasGlobalExclusions(p.Expression, clause) {
 		if p.Expression != "" {
-			p.Expression += " AND "
+			p.Expression = "(" + p.Expression + ") AND "
 		}
 		p.Expression += clause
 	}
 	p.Explanations = append(p.Explanations, "Исключения применены к названию и описанию вакансии через NOT.")
 	return p
+}
+
+// Only a clause applied to a complete parenthesized expression is safe to
+// reuse. A matching substring may belong to one OR branch or a quoted phrase.
+func hasGlobalExclusions(expression, clause string) bool {
+	suffix := " AND " + clause
+	if !strings.HasSuffix(expression, suffix) {
+		return expression == clause
+	}
+	base := strings.TrimSpace(strings.TrimSuffix(expression, suffix))
+	if len(base) < 2 || base[0] != '(' || base[len(base)-1] != ')' {
+		return false
+	}
+	depth := 0
+	quoted := false
+	for index, char := range base {
+		if char == '"' {
+			quoted = !quoted
+		}
+		if quoted {
+			continue
+		}
+		switch char {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 && index != len(base)-1 {
+				return false
+			}
+		}
+	}
+	return depth == 0 && !quoted
 }
 
 // ApplyExclusions adds the same normalized NOT clause used by Optimize. It is

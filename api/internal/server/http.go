@@ -202,10 +202,6 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Сначала подтвердите поисковый запрос")
 		return
 	}
-	if len(input.ExcludeWords) > 1600 {
-		fail(w, 400, "Исключения слишком длинные")
-		return
-	}
 	if _, err := core.OptimizeWithExclusions(input.Query, input.Mode, input.ExcludeWords); err != nil {
 		fail(w, 400, err.Error())
 		return
