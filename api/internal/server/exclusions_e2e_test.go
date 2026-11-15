@@ -152,6 +152,51 @@ type exclusionsTransport struct {
 	fixture *exclusionsFixture
 }
 
+type exclusionsFilterOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
+type exclusionsFilterGroup struct {
+	Key     string                   `json:"key"`
+	Label   string                   `json:"label"`
+	Options []exclusionsFilterOption `json:"options"`
+}
+
+// Keep the preview's synthetic filter contract aligned with frontend/mocks/fixtures.ts.
+// Production filters continue to come exclusively from the runner.
+func exclusionsFilterGroups() []exclusionsFilterGroup {
+	return []exclusionsFilterGroup{
+		{Key: "area", Label: "Регион", Options: []exclusionsFilterOption{
+			{Value: "1", Label: "Москва", Count: 48}, {Value: "2", Label: "Санкт-Петербург", Count: 44},
+		}},
+		{Key: "experience", Label: "Опыт работы", Options: []exclusionsFilterOption{
+			{Value: "noExperience", Label: "Нет опыта", Count: 12}, {Value: "between1And3", Label: "От 1 года до 3 лет", Count: 12},
+			{Value: "between3And6", Label: "От 3 до 6 лет", Count: 12}, {Value: "moreThan6", Label: "Более 6 лет", Count: 12},
+		}},
+		{Key: "work_format", Label: "Формат работы", Options: []exclusionsFilterOption{
+			{Value: "REMOTE", Label: "Удалённо", Count: 20}, {Value: "ON_SITE", Label: "Офис", Count: 20}, {Value: "HYBRID", Label: "Гибрид", Count: 20},
+		}},
+		{Key: "employment_form", Label: "Тип оформления", Options: []exclusionsFilterOption{
+			{Value: "LABOUR", Label: "ТК РФ", Count: 12}, {Value: "CIVIL", Label: "ГПХ", Count: 12},
+			{Value: "SELF_EMPLOYED", Label: "Самозанятость", Count: 12}, {Value: "IP", Label: "ИП", Count: 12},
+		}},
+		{Key: "education", Label: "Образование", Options: []exclusionsFilterOption{
+			{Value: "higher", Label: "Высшее", Count: 32}, {Value: "not_required_or_not_specified", Label: "Не требуется или не указано", Count: 16},
+		}},
+		{Key: "professional_role", Label: "Специализация", Options: []exclusionsFilterOption{
+			{Value: "96", Label: "Программист, разработчик", Count: 36}, {Value: "10", Label: "Аналитик", Count: 12},
+		}},
+		{Key: "work_schedule_by_days", Label: "График работы", Options: []exclusionsFilterOption{
+			{Value: "FIVE_ON_TWO_OFF", Label: "5/2", Count: 36}, {Value: "TWO_ON_TWO_OFF", Label: "2/2", Count: 12},
+		}},
+		{Key: "working_hours", Label: "Рабочие часы", Options: []exclusionsFilterOption{
+			{Value: "HOURS_8", Label: "8 часов", Count: 36}, {Value: "HOURS_4", Label: "4 часа", Count: 12},
+		}},
+	}
+}
+
 func (tr exclusionsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Scheme+"://"+req.URL.Host != tr.allowed {
 		tr.fixture.mu.Lock()
@@ -176,10 +221,7 @@ func newExclusionsFixture(t *testing.T) *exclusionsFixture {
 				write(w, 200, map[string]any{"ok": false, "class": "input", "reason": "Synthetic filter failure"})
 				return
 			}
-			write(w, 200, map[string]any{"ok": true, "data": []any{
-				map[string]any{"key": "area", "label": "Регион", "options": []any{map[string]any{"value": "1", "label": "Москва", "count": 12}}},
-				map[string]any{"key": "experience", "label": "Опыт работы", "options": []any{map[string]any{"value": "noExperience", "label": "Нет опыта", "count": 4}}},
-			}})
+			write(w, 200, map[string]any{"ok": true, "data": exclusionsFilterGroups()})
 		case "/search":
 			var args map[string]string
 			if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
@@ -314,7 +356,11 @@ func TestExclusionsEndToEnd(t *testing.T) {
 			if edit {
 				proposal.Expression = "NAME:python OR NAME:java"
 			}
-			created := exclusionsRequest(t, handler, "POST", "/api/analyses", map[string]any{"query": "Python OR Java", "mode": "roles", "excludeWords": "junior, junior;руководитель проекта", "expression": proposal.Expression, "filters": map[string]string{"area": "1"}, "confirmed": true})
+			filters := map[string]string{
+				"area": "1", "experience": "between1And3", "work_format": "REMOTE", "employment_form": "LABOUR",
+				"education": "higher", "professional_role": "96", "work_schedule_by_days": "FIVE_ON_TWO_OFF", "working_hours": "HOURS_8",
+			}
+			created := exclusionsRequest(t, handler, "POST", "/api/analyses", map[string]any{"query": "Python OR Java", "mode": "roles", "excludeWords": "junior, junior;руководитель проекта", "expression": proposal.Expression, "filters": filters, "confirmed": true})
 			var a core.Analysis
 			if err := json.Unmarshal(created.Body.Bytes(), &a); err != nil || created.Code != 201 {
 				t.Fatalf("create: %d %s %v", created.Code, created.Body.String(), err)
@@ -337,10 +383,57 @@ func TestExclusionsEndToEnd(t *testing.T) {
 			}
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			if len(f.searches) != 1 || f.searches[0]["text"] != want || f.searches[0]["area"] != "1" {
+			if len(f.searches) != 1 || f.searches[0]["text"] != want {
 				t.Fatalf("runner did not receive confirmed expression and filters: %+v", f.searches)
 			}
+			for key, value := range filters {
+				if result.Filters[key] != value || f.searches[0][key] != value {
+					t.Fatalf("filter %s=%s was lost: stored=%v runner=%v", key, value, result.Filters, f.searches[0])
+				}
+			}
 		})
+	}
+}
+
+func TestExclusionsFiltersExposeAllSearchGroups(t *testing.T) {
+	f := newExclusionsFixture(t)
+	w := exclusionsRequest(t, f.handler(), "GET", "/api/filters", nil)
+	var response struct {
+		Groups []exclusionsFilterGroup `json:"groups"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || w.Code != 200 {
+		t.Fatalf("filters: %d %s %v", w.Code, w.Body.String(), err)
+	}
+	want := map[string][]string{
+		"area":                  {"1", "2"},
+		"experience":            {"noExperience", "between1And3", "between3And6", "moreThan6"},
+		"work_format":           {"REMOTE", "ON_SITE", "HYBRID"},
+		"employment_form":       {"LABOUR", "CIVIL", "SELF_EMPLOYED", "IP"},
+		"education":             {"higher", "not_required_or_not_specified"},
+		"professional_role":     {"96", "10"},
+		"work_schedule_by_days": {"FIVE_ON_TWO_OFF", "TWO_ON_TWO_OFF"},
+		"working_hours":         {"HOURS_8", "HOURS_4"},
+	}
+	if len(response.Groups) != len(want) {
+		t.Fatalf("preview dropped filter groups: got %d want %d", len(response.Groups), len(want))
+	}
+	seen := map[string]bool{}
+	for _, group := range response.Groups {
+		options, ok := want[group.Key]
+		if !ok || seen[group.Key] || group.Label == "" || len(group.Options) != len(options) {
+			t.Fatalf("unexpected, repeated or incomplete group: %+v", group)
+		}
+		seen[group.Key] = true
+		for index, option := range group.Options {
+			if option.Value != options[index] || option.Label == "" || option.Count <= 0 {
+				t.Fatalf("invalid filter option in %s: %+v", group.Key, option)
+			}
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.documents) != 0 || len(f.searches) != 0 {
+		t.Fatal("loading filter choices started or saved an analysis")
 	}
 }
 
