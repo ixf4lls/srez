@@ -1,8 +1,9 @@
 import type { Analysis, FilterGroup, Metric, Report, Vacancy } from '../src/types.ts';
+import { gradeLabels } from '../src/grades.ts';
 
 const day = 86_400_000;
 const cities = ['Москва', 'Санкт-Петербург', 'Казань', 'Новосибирск', 'Екатеринбург', 'Нижний Новгород', 'Самара'];
-const grades = ['Junior', 'Middle', 'Senior', 'Lead', 'Не указан'];
+const grades = ['Junior', 'Middle', 'Senior', 'Lead', 'Не указан', 'Middle / Senior', 'Junior / Middle', 'Senior / Lead'];
 const experiences = ['Нет опыта', 'От 1 года до 3 лет', 'От 3 до 6 лет', 'Более 6 лет'];
 const formats = [['Удалённо'], ['Офис'], ['Гибрид'], ['Офис', 'Удалённо', 'Гибрид']];
 const salaries = [
@@ -75,7 +76,7 @@ export function makeReport(vacancies: Vacancy[]): Report {
       groups.set(label, { key: label, label, count: 0, percent: 0, vacancyIds: [], evidence: [] });
     }
     for (const vacancy of loaded) {
-      const values = key === 'format' ? vacancy.workFormats : [vacancy[key] || 'Не указан'];
+      const values = key === 'format' ? vacancy.workFormats : key === 'grade' ? gradeLabels(vacancy.grade) : [vacancy[key] || 'Не указан'];
       for (const label of values) {
         const metric = groups.get(label) ?? { key: label, label, count: 0, percent: 0, vacancyIds: [], evidence: [] };
         metric.vacancyIds.push(vacancy.id);

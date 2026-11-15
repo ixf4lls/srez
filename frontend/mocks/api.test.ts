@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMockApi } from './api.ts';
-import { deriveReport } from '../src/analytics.ts';
+import { deriveReport, filterVacancies } from '../src/analytics.ts';
 import type { Analysis, FilterGroup, Vacancy } from '../src/types.ts';
 
 const initialTime = Date.parse('2026-11-09T10:00:00Z');
@@ -141,4 +141,24 @@ test('invalid requests, missing analyses and empty/reset scenarios return useful
   assert.deepEqual(api.handle('GET', '/api/analyses').body, []);
   api.handle('POST', '/api/mock/reset');
   assert.equal((api.handle('GET', '/api/analyses').body as Analysis[]).length, 10);
+});
+
+
+test('mock reports split compound grade metrics and filter their original vacancies once', () => {
+  const api = createMockApi(() => initialTime);
+  const analysis = api.handle('GET', `/api/analyses/${completedId}`).body as Analysis;
+  const vacancies = api.handle('GET', `/api/analyses/${completedId}/vacancies`).body as Vacancy[];
+  const compound = vacancies.find(v => v.loaded && v.grade === 'Middle / Senior')!;
+  assert.ok(compound);
+  const metrics = analysis.report!.dimensions.grade;
+  assert.ok(metrics.every(metric => !metric.label.includes('/')));
+  for (const grade of ['Middle', 'Senior']) {
+    const metric = metrics.find(metric => metric.label === grade)!;
+    assert.equal(metric.vacancyIds.filter(id => id === compound.id).length, 1);
+    assert.ok(filterVacancies(vacancies, { grade: [grade] }).some(v => v.id === compound.id));
+  }
+  const selected = filterVacancies(vacancies, { grade: ['Middle', 'Senior'] });
+  assert.equal(selected.filter(v => v.id === compound.id).length, 1);
+  assert.equal(new Set(selected.map(v => v.id)).size, selected.length);
+  assert.equal(analysis.report!.total, vacancies.filter(v => v.loaded).length);
 });

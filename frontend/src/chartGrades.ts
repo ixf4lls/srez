@@ -1,16 +1,17 @@
 import { kitColors } from './designTokens.ts';
+import { gradeLabels } from './grades.ts';
 
 const grades = ['Junior', 'Middle', 'Senior', 'Lead'];
 const pointStep = 16;
 
 export function gradeLabel(value?: string): string {
-  return value?.split('/').map(part => part.trim()).filter(Boolean).map(part => grades.find(grade => grade.toLowerCase() === part.toLowerCase()) || part).join(' / ') || 'Не указан';
+  return gradeLabels(value).join(' / ');
 }
 
 function gradeRank(label: string): number {
   if (label === 'Не указан') return 100;
-  const ranks = label.split(' / ').map(part => grades.indexOf(part)).filter(rank => rank >= 0);
-  return ranks.length ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : 50;
+  const rank = grades.indexOf(label);
+  return rank >= 0 ? rank : 50;
 }
 
 export function gradeColor(value?: string): string {
@@ -28,9 +29,10 @@ export type GradedPoint<T> = T & { chartX: number; chartGrade: string; chartColo
 export function gradeLayout<T extends { grade?: string }>(points: readonly T[], amount: (point: T) => number): { points: GradedPoint<T>[]; groups: GradeBand[]; width: number } {
   const members = new Map<string, T[]>();
   for (const point of points) {
-    const label = gradeLabel(point.grade);
-    const group = members.get(label);
-    if (group) group.push(point); else members.set(label, [point]);
+    for (const label of gradeLabels(point.grade)) {
+      const group = members.get(label);
+      if (group) group.push(point); else members.set(label, [point]);
+    }
   }
   const groups: GradeBand[] = [];
   const ordered: GradedPoint<T>[] = [];

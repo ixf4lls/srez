@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gradeColor, gradeLabel, gradeLayout } from './chartGrades.ts';
+import { gradeLabels } from './grades.ts';
 import { deriveReport, salaryGroups } from './analytics.ts';
 import type { Report, Vacancy } from './types.ts';
 
@@ -48,4 +49,52 @@ test('salary and response chart points inherit grades from the same source vacan
   assert.equal(salaryGroups([vacancy])[0].points[0].grade, 'Senior');
   assert.equal(deriveReport(base, [vacancy]).responses[0].grade, 'Senior');
   assert.equal(deriveReport(base, [{ ...vacancy, grade: '' }]).responses[0].grade, 'Не указан');
+});
+
+
+test('grade membership canonicalizes and deduplicates every explicit slash-separated grade', () => {
+  assert.deepEqual(gradeLabels(' middle / SENIOR / middle // Lead / '), ['Middle', 'Senior', 'Lead']);
+  assert.deepEqual(gradeLabels('Junior/Senior'), ['Junior', 'Senior']);
+  assert.deepEqual(gradeLabels(' / / '), ['Не указан']);
+  assert.deepEqual(gradeLabels(), ['Не указан']);
+  assert.deepEqual(gradeLabels('не указан / Не указан'), ['Не указан']);
+  assert.deepEqual(gradeLabels('Staff / Middle'), ['Staff', 'Middle']);
+});
+
+test('compound grades contribute one sorted point per membership without changing source data', () => {
+  const source = [
+    { id: 'compound', grade: ' middle / Senior / middle ', amount: 20 },
+    { id: 'triple', grade: 'Junior/Middle/Senior', amount: 10 },
+    { id: 'single', grade: 'Senior', amount: 0 },
+  ];
+  const original = structuredClone(source);
+  const layout = gradeLayout(source, point => point.amount);
+  assert.deepEqual(layout.groups.map(group => group.label), ['Junior', 'Middle', 'Senior']);
+  assert.deepEqual(layout.points.map(point => [point.chartGrade, point.id]), [
+    ['Junior', 'triple'], ['Middle', 'triple'], ['Middle', 'compound'],
+    ['Senior', 'single'], ['Senior', 'triple'], ['Senior', 'compound'],
+  ]);
+  assert.deepEqual(source, original);
+  for (const point of layout.points) {
+    assert.equal(point.chartColor, gradeColor(point.chartGrade));
+    assert.ok(gradeLabels(point.grade).includes(point.chartGrade));
+  }
+  assert.equal(new Set(layout.points.map(point => point.chartX)).size, layout.points.length);
+});
+
+test('salary and response charts repeat the same source vacancy in each member grade', () => {
+  const vacancy = { id: 'compound', title: 'Job', grade: 'Middle/Senior', loaded: true, salary: '100 000 ₽ за месяц, на руки', responseCount: 0, keySkills: [], requirements: [], workFormats: [] } as unknown as Vacancy;
+  const base: Report = { total: 0, dimensions: {}, skills: [], requirements: [], responses: [], responseMean: null, responseCoverage: 0, skillsCoverage: 0, requirementsCoverage: 0, version: 'test' };
+  const report = deriveReport(base, [vacancy]);
+  const salaries = gradeLayout(salaryGroups([vacancy])[0].points, point => point.normalizedRange[1]);
+  const responses = gradeLayout(report.responses, point => point.count);
+  assert.deepEqual(salaries.points.map(point => [point.id, point.chartGrade, point.normalizedRange[1]]), [
+    ['compound', 'Middle', 100000], ['compound', 'Senior', 100000],
+  ]);
+  assert.deepEqual(responses.points.map(point => [point.id, point.chartGrade, point.count]), [
+    ['compound', 'Middle', 0], ['compound', 'Senior', 0],
+  ]);
+  assert.equal(report.total, 1);
+  assert.equal(report.responseCoverage, 1);
+  assert.equal(report.responseMean, 0);
 });

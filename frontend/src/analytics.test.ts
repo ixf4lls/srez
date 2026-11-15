@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deriveReport,employmentForms,filterVacancies,netFromGross,normalizeSalary,normalizedSalaryLabel,parseSalary,salaryAxis,salaryGroups,workFormats} from './analytics.ts';
+import {deriveReport,employmentForms,filterVacancies,netFromGross,normalizeSalary,normalizedSalaryLabel,parseSalary,readViewFilters,salaryAxis,salaryGroups,workFormats} from './analytics.ts';
 import type {Report,Vacancy} from './types.ts';
 
 const vacancy=(id:string,values:Partial<Vacancy>={}):Vacancy=>({id,url:`https://hh.ru/vacancy/${id}`,title:`Job ${id}`,company:'Example',salary:'',city:'Москва',address:'Москва',experience:'1–3 года',workFormats:['на месте работодателя, удалённо или гибрид'],format:'Офис / Гибрид / Удалённо',grade:'Middle',employment:'',workSchedule:'',workingHours:'',description:'',keySkills:[],responseCount:null,publishedAt:'',collectedAt:'2026-11-01T09:00:00Z',loaded:true,requirements:[],...values});
@@ -100,4 +100,51 @@ test('salary axis uses one unit and a linear scale covering every salary bound',
  assert.deepEqual(salaryAxis(900000).ticks.map(salaryAxis(900000).formatTick),['0','0,25','0,5','0,75','1']);
  assert.deepEqual(salaryAxis(9000000).ticks.map(salaryAxis(9000000).formatTick),['0','2,5','5','7,5','10']);
  assert.ok(Number.isFinite(salaryAxis(Infinity).domain[1]));
+});
+
+
+test('grade metrics overlap while totals, sources and response means count original vacancies',()=>{
+ const vs=[
+  vacancy('1',{grade:' middle / SENIOR / middle ',responseCount:0}),
+  vacancy('2',{grade:'Junior/Middle/Senior',responseCount:90}),
+  vacancy('3',{grade:' / ',responseCount:null}),
+  vacancy('4',{grade:'Middle/Senior',loaded:false,responseCount:999}),
+ ];
+ const report=deriveReport(base,vs);
+ const metrics=Object.fromEntries(report.dimensions.grade.map(metric=>[metric.label,metric]));
+ assert.deepEqual(Object.keys(metrics).sort(),['Junior','Middle','Senior','Не указан'].sort());
+ assert.equal(metrics.Middle.count,2);assert.equal(metrics.Middle.percent,66.7);
+ assert.deepEqual(metrics.Middle.vacancyIds,['1','2']);
+ assert.deepEqual(metrics.Senior.vacancyIds,['1','2']);
+ assert.deepEqual(metrics.Middle.evidence,[{vacancyId:'1',field:'grade',quote:'Middle'},{vacancyId:'2',field:'grade',quote:'Middle'}]);
+ assert.equal(metrics.Junior.count,1);assert.equal(metrics['Не указан'].count,1);
+ assert.equal(report.total,3);assert.equal(report.responseCoverage,2);assert.equal(report.responseMean,45);
+ assert.equal(report.responses.length,2);
+});
+
+test('grade filters use membership with OR within grade and AND across other dimensions',()=>{
+ const vs=[vacancy('1',{grade:'Middle / Senior',responseCount:0}),vacancy('2',{grade:'Senior',city:'Казань',responseCount:10}),vacancy('3',{grade:'Junior / Middle',responseCount:20}),vacancy('4',{grade:'',responseCount:null}),vacancy('5',{grade:'Senior',loaded:false})];
+ assert.deepEqual(filterVacancies(vs,{grade:['Middle']}).map(v=>v.id),['1','3']);
+ assert.deepEqual(filterVacancies(vs,{grade:['Senior']}).map(v=>v.id),['1','2']);
+ assert.deepEqual(filterVacancies(vs,{grade:['Middle','Senior']}).map(v=>v.id),['1','2','3']);
+ assert.deepEqual(filterVacancies(vs,{grade:['Middle','Senior'],city:['Москва']}).map(v=>v.id),['1','3']);
+ assert.deepEqual(filterVacancies(vs,{grade:['Не указан']}).map(v=>v.id),['4']);
+ const filtered=deriveReport(base,filterVacancies(vs,{grade:['Senior'],city:['Москва']}));
+ assert.equal(filtered.total,1);assert.equal(filtered.responseMean,0);
+ assert.deepEqual(filtered.dimensions.grade.map(metric=>[metric.label,metric.count,metric.percent,metric.vacancyIds]),[['Middle',1,100,['1']],['Senior',1,100,['1']]]);
+});
+
+
+test('saved compound grade URL filters become standalone membership filters',()=>{
+ const original=Object.getOwnPropertyDescriptor(globalThis,'location');
+ try {
+  for(const grade of [' middle / SENIOR ',['Middle / Senior','senior','Junior / Middle']]) {
+   Object.defineProperty(globalThis,'location',{configurable:true,value:{search:`?view=${encodeURIComponent(JSON.stringify({grade,city:['Москва']}))}`}});
+   const filters=readViewFilters();
+   assert.deepEqual(filters,{city:['Москва'],grade:typeof grade==='string'?['Middle','Senior']:['Middle','Senior','Junior']});
+   assert.deepEqual(filterVacancies([vacancy('both',{grade:'Middle/Senior'}),vacancy('single',{grade:'Senior',city:'Казань'})],filters).map(v=>v.id),['both']);
+  }
+ } finally {
+  if(original)Object.defineProperty(globalThis,'location',original);else Reflect.deleteProperty(globalThis,'location');
+ }
 });

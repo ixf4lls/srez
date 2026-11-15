@@ -1,4 +1,5 @@
 import type {Metric,Report,Vacancy} from './types.ts';
+import {gradeLabels} from './grades.ts';
 
 export const dimensions = [
   {key:'city', title:'География'},
@@ -43,6 +44,7 @@ export function matches(v:Vacancy, filters:ViewFilters):boolean {
     if(key==='format')return selected.some(value=>workFormats(v).includes(value));
     if(key==='employmentForm')return selected.some(value=>employmentForms(v).includes(value));
     if(key==='company')return selected.includes(companyName(v));
+    if(key==='grade')return selected.some(value=>gradeLabels(v.grade).includes(value));
     return selected.includes(v[key]||'Не указан');
   });
 }
@@ -56,7 +58,7 @@ function group(vacancies:Vacancy[],key:Dimension):Metric[] {
   const groups=new Map<string,Metric>();
   if(key==='format')for(const label of formats)groups.set(label,{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]});
   for(const v of vacancies){
-    const values=key==='format'?workFormats(v):key==='employmentForm'?employmentForms(v):key==='company'?[companyName(v)]:[v[key]||'Не указан'];
+    const values=key==='format'?workFormats(v):key==='employmentForm'?employmentForms(v):key==='company'?[companyName(v)]:key==='grade'?gradeLabels(v.grade):[v[key]||'Не указан'];
     for(const label of values){
       const m=groups.get(label)??{key:label,label,count:0,percent:0,vacancyIds:[],evidence:[]};
       m.count++;m.vacancyIds.push(v.id);
@@ -191,8 +193,9 @@ export function readViewFilters():ViewFilters {
     const value=JSON.parse(new URLSearchParams(location.search).get('view')||'{}');
     return Object.fromEntries(dimensions.flatMap(({key})=>{
       const values=Array.isArray(value?.[key])?value[key]:typeof value?.[key]==='string'?[value[key]]:[];
-      const valid=[...new Set(values.filter((v:unknown)=>typeof v==='string'&&v.length<=200))].slice(0,100);
-      return valid.length?[[key,valid]]:[];
+      const valid:string[]=[...new Set<string>(values.filter((v:unknown)=>typeof v==='string'&&v.length<=200))].slice(0,100);
+      const selected=key==='grade'?[...new Set(valid.flatMap(gradeLabels))].slice(0,100):valid;
+      return selected.length?[[key,selected]]:[];
     }));
   }catch{return {}}
 }
