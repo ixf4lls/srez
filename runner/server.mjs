@@ -9,19 +9,31 @@ const home = process.env.API_ANYTHING_HOME || join(process.cwd(), '.runtime');
 process.env.API_ANYTHING_HOME = home;
 const source = process.env.SESSION_SOURCE || `${process.env.HOME}/.api-anything/sessions/hh.json`;
 let stamp = 0;
+let sessionError = '';
 function syncSession() {
   try {
-    const m = statSync(source).mtimeMs;
+    const info = statSync(source);
+    if (!info.isFile()) throw new Error('Путь сессии является папкой. Экспортируйте сессию: node scripts/export-session.mjs');
+    const m = info.mtimeMs;
     if (m <= stamp) return true;
-    const session = JSON.parse(readFileSync(source, 'utf8'));
+    const text = readFileSync(source, 'utf8');
+    if (text.startsWith('#api-anything-sealed')) throw new Error('Сессия зашифрована на компьютере. Выполните там: node scripts/export-session.mjs');
+    const session = JSON.parse(text);
+    if (!session || !Array.isArray(session.cookies) || !session.cookies.length) throw new Error('В файле сессии нет cookies. Завершите вход и экспортируйте сессию.');
     // Never attempt to open a host browser/keychain from the container.
     delete session.source;
     const dest = join(home, 'sessions/hh.json');
     mkdirSync(dirname(dest), { recursive: true, mode: 0o700 });
     writeFileSync(dest, JSON.stringify(session), { mode: 0o600 });
     stamp = m;
+    sessionError = '';
     return true;
-  } catch { return false; }
+  } catch (error) {
+    const message = error.code === 'ENOENT' ? 'Файл сессии не найден. Завершите вход и выполните на компьютере: node scripts/export-session.mjs' : error.message;
+    if (message !== sessionError) console.error('Session sync failed:', message);
+    sessionError = message;
+    return false;
+  }
 }
 
 function installSearch(args) {
@@ -66,7 +78,7 @@ async function complete(result) {
 }
 
 async function execute(kind, input = {}) {
-  if (!syncSession()) return { ok:false, class:'auth', reason:'Сессия hh.ru не найдена. Выполните на компьютере: api-anything login hh --window', next:'Завершите вход и повторите действие.' };
+  if (!syncSession()) return { ok:false, class:'auth', reason:sessionError, next:'Завершите вход, выполните node scripts/export-session.mjs и повторите действие.' };
   const args = Object.fromEntries(Object.entries(input).filter(([,v]) => v !== '' && v != null));
   const search = kind !== 'vacancy';
   if (search) { args.text ||= 'разработчик'; args.page = String(args.page ?? '0'); }
@@ -105,7 +117,7 @@ async function execute(kind, input = {}) {
 let queue = Promise.resolve();
 const send = (res, status, data) => { res.writeHead(status, { 'content-type':'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
 http.createServer(async (req,res) => {
-  if (req.method === 'GET' && req.url === '/health') return send(res,200,{ ok:true, session:syncSession(), provider:'api-anything', version:'0.3.2' });
+  if (req.method === 'GET' && req.url === '/health') { const session = syncSession(); return send(res,200,{ ok:true, session, ...(session ? {} : { sessionError }), provider:'api-anything', version:'0.3.2' }); }
   const kind = req.url?.slice(1);
   if (req.method !== 'POST' || !['search','vacancy','filters'].includes(kind)) return send(res,404,{error:'Not found'});
   try {

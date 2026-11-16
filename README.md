@@ -32,7 +32,21 @@ __‼️ Приложение использует локальные сесси
    api-anything login hh --window
    ```
 
-   Завершите вход в открывшемся окне и закройте его. Файл сессии должен находиться в `~/.api-anything/sessions/hh.json`.
+   Завершите вход в открывшемся окне и закройте его. Затем из корня проекта экспортируйте сессию для runner:
+
+   ```sh
+   node scripts/export-session.mjs
+   ```
+
+   api-anything 0.4 хранит сессию в зашифрованном виде с ключом из системного хранилища. Скрипт читает её на компьютере и создаёт локальную копию `.runtime/host-sessions/hh.json` с правами `0600`, которую понимает runner. Копия содержит cookies, исключена из Git и доступна контейнеру только для чтения.
+
+   Если после успешного входа api-anything пишет `no sign-in seen`, он мог не распознать cookies авторизации hh.ru. В этом случае экспортируйте cookies из его отдельного профиля браузера:
+
+   ```sh
+   node scripts/export-session.mjs --browser-profile
+   ```
+
+   Этот режим копирует cookies профиля; наличие действующего входа проверяется при запросах к hh.ru.
 
 3. Из корня проекта запустите контейнеры:
 
@@ -50,7 +64,7 @@ __‼️ Приложение использует локальные сесси
 | Переменная | Назначение | По умолчанию |
 | --- | --- | --- |
 | `APP_PORT` | Порт приложения | `3000` |
-| `API_ANYTHING_SOURCE` | Каталог api-anything с файлом `sessions/hh.json` | `~/.api-anything` |
+| `API_ANYTHING_SOURCE` | Каталог с экспортированным файлом `hh.json` | `./.runtime/host-sessions` |
 | `POSTGRES_PASSWORD` | Пароль локальной базы | `hh-local-development` |
 
 ### Управление
@@ -62,7 +76,7 @@ docker compose down                # остановка с сохранение�
 
 История хранится в Docker volume `hh-analytics_postgres_data`, данные runner в `hh-analytics_runner_data`. Команда `docker compose down -v` удаляет эти данные.
 
-Если сессия hh.ru истекла, повторите `api-anything login hh --window` и нажмите «Продолжить сбор» в приложении. Пересборка не нужна. Если файл сессии был заменён целиком, пересоздайте runner:
+Если сессия hh.ru истекла, повторите `api-anything login hh --window`, закройте окно, выполните `node scripts/export-session.mjs` и нажмите «Продолжить сбор». Runner видит обновления файла без перезапуска, поскольку подключён весь каталог. При переходе со старого подключения файла пересоздайте runner:
 
 ```sh
 docker compose up -d --force-recreate runner

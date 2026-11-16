@@ -18,10 +18,15 @@ services:
     build: ./runner
     environment:
       API_ANYTHING_HOME: /var/lib/api-anything
-      SESSION_SOURCE: /seed/hh-session.json
+      SESSION_SOURCE: /seed/hh.json
       PORT: '8091'
     volumes:
-      - ${API_ANYTHING_SOURCE:-${HOME}/.api-anything}/sessions/hh.json:/seed/hh-session.json:ro
+      - type: bind
+        source: ${API_ANYTHING_SOURCE:-./.runtime/host-sessions}
+        target: /seed
+        read_only: true
+        bind:
+          create_host_path: false
       - runner_data:/var/lib/api-anything
     healthcheck:
       test: [CMD, node, -e, "fetch('http://localhost:8091/health').then(r=>{if(!r.ok)process.exit(1)})"]
